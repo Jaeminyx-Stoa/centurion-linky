@@ -30,12 +30,12 @@ dependencies = [
     "python-multipart>=0.0.12",
     "openpyxl>=3.1.0",
     # LangChain (Phase 2)
-    # "langchain>=0.3.0",
-    # "langchain-anthropic>=0.3.0",
-    # "langchain-openai>=0.3.0",
-    # "langchain-google-genai>=2.0.0",
-    # "langchain-community>=0.3.0",
-    # "langsmith>=0.2.0",
+    "langchain>=0.3.0",
+    "langchain-anthropic>=0.3.0",
+    "langchain-openai>=0.3.0",
+    "langchain-google-genai>=2.0.0",
+    "langchain-community>=0.3.0",
+    "langsmith>=0.2.0",
     # Azure
     # "azure-storage-blob>=12.0.0",
 ]

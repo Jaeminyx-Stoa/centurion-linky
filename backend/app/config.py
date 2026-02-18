@@ -31,6 +31,28 @@ class Settings(BaseSettings):
     jwt_access_token_expire_minutes: int = 30
     jwt_refresh_token_expire_days: int = 7
 
+    # AI - Anthropic (Claude)
+    anthropic_api_key: str = ""
+
+    # AI - Azure OpenAI
+    azure_openai_api_key: str = ""
+    azure_openai_endpoint: str = ""
+    azure_openai_api_version: str = "2024-10-21"
+    azure_openai_deployment_name: str = "gpt-4o"
+    azure_openai_mini_deployment_name: str = "gpt-4o-mini"
+    azure_openai_embedding_deployment: str = "text-embedding-3-small"
+
+    # AI - Google Gemini
+    google_api_key: str = ""
+
+    # LangSmith
+    langsmith_api_key: str = ""
+    langsmith_project: str = "medical-messenger"
+
+    # AI defaults
+    ai_temperature: float = 0.7
+    ai_max_tokens: int = 1024
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",")]
