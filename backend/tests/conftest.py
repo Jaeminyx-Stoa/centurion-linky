@@ -11,9 +11,7 @@ from app.config import settings
 from app.core.database import get_db
 from app.core.security import hash_password
 from app.main import app
-from app.models.base import Base
-from app.models.clinic import Clinic
-from app.models.user import User
+from app.models import Base, Clinic, MessengerAccount, User
 
 # Test database engine — NullPool prevents connection sharing issues in async tests
 test_engine = create_async_engine(settings.database_url, echo=False, poolclass=NullPool)

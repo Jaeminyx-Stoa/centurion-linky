@@ -9,6 +9,10 @@ from app.models.base import Base
 
 # Import all models so Alembic detects them for autogenerate
 from app.models.clinic import Clinic  # noqa: F401
+from app.models.conversation import Conversation  # noqa: F401
+from app.models.customer import Customer  # noqa: F401
+from app.models.message import Message  # noqa: F401
+from app.models.messenger_account import MessengerAccount  # noqa: F401
 from app.models.user import User  # noqa: F401
 
 config = context.config

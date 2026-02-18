@@ -30,6 +30,9 @@ class Clinic(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     # Relationships
     users: Mapped[list["User"]] = relationship(back_populates="clinic")  # noqa: F821
+    messenger_accounts: Mapped[list["MessengerAccount"]] = relationship(  # noqa: F821
+        back_populates="clinic"
+    )
 
     def __repr__(self) -> str:
         return f"<Clinic {self.slug}>"
