@@ -43,6 +43,12 @@ export const api = {
 
   post: <T>(path: string, body: unknown, options?: FetchOptions) =>
     request<T>(path, { ...options, method: "POST", body: JSON.stringify(body) }),
+
+  patch: <T>(path: string, body: unknown, options?: FetchOptions) =>
+    request<T>(path, { ...options, method: "PATCH", body: JSON.stringify(body) }),
+
+  delete: <T>(path: string, options?: FetchOptions) =>
+    request<T>(path, { ...options, method: "DELETE" }),
 };
 
 export { ApiError };
