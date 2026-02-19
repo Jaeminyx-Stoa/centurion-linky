@@ -1,8 +1,10 @@
 from fastapi import APIRouter
 
 from app.api.v1.ab_tests import router as ab_tests_router
+from app.api.v1.analytics import router as analytics_router
 from app.api.v1.ai_personas import router as ai_personas_router
 from app.api.v1.auth import router as auth_router
+from app.api.v1.clinics import router as clinics_router
 from app.api.v1.bookings import router as bookings_router
 from app.api.v1.conversations import router as conversations_router
 from app.api.v1.crm import router as crm_router
@@ -24,6 +26,7 @@ router.include_router(ab_tests_router)
 router.include_router(ai_personas_router)
 router.include_router(auth_router)
 router.include_router(bookings_router)
+router.include_router(clinics_router)
 router.include_router(clinic_procedures_router)
 router.include_router(conversations_router)
 router.include_router(crm_router)

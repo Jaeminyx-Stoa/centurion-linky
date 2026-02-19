@@ -4,6 +4,8 @@ import { useRouter, usePathname } from "next/navigation";
 import {
   MessageSquare,
   BarChart3,
+  Syringe,
+  Receipt,
   Settings,
   LogOut,
 } from "lucide-react";
@@ -12,7 +14,9 @@ import { useAuthStore } from "@/stores/auth";
 
 const NAV_ITEMS = [
   { icon: MessageSquare, label: "받은 메시지", href: "/" },
+  { icon: Syringe, label: "시술 관리", href: "/procedures" },
   { icon: BarChart3, label: "통계", href: "/analytics" },
+  { icon: Receipt, label: "정산", href: "/settlements" },
   { icon: Settings, label: "설정", href: "/settings" },
 ];
 

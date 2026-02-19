@@ -29,6 +29,19 @@ async def _get_customer(
     return customer
 
 
+@router.get("", response_model=list[CustomerDetailResponse])
+async def list_customers(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(Customer)
+        .where(Customer.clinic_id == current_user.clinic_id)
+        .order_by(Customer.created_at.desc())
+    )
+    return result.scalars().all()
+
+
 @router.get("/{customer_id}", response_model=CustomerDetailResponse)
 async def get_customer(
     customer_id: uuid.UUID,
