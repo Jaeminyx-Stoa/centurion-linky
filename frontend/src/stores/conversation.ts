@@ -132,7 +132,9 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
               last_message_preview: message.content.slice(0, 200),
               last_message_at: message.created_at,
               unread_count:
-                c.id === selectedId ? c.unread_count : c.unread_count + 1,
+                c.id === selectedId || message.sender_type !== "customer"
+                  ? c.unread_count
+                  : c.unread_count + 1,
             }
           : c,
       ),

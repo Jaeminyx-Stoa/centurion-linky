@@ -62,7 +62,9 @@ async def an_data(db: AsyncSession, an_clinic: Clinic):
     account = MessengerAccount(
         id=uuid.uuid4(),
         clinic_id=an_clinic.id,
-        platform="telegram",
+        messenger_type="telegram",
+        account_name="analytics_bot",
+        credentials={"bot_token": "test"},
         is_active=True,
     )
     db.add(account)
@@ -112,10 +114,11 @@ async def an_data(db: AsyncSession, an_clinic: Clinic):
             clinic_id=an_clinic.id,
             customer_id=customer.id,
             booking_id=None,
+            payment_type="deposit",
             amount=Decimal("100000"),
             currency="KRW",
             status="completed",
-            provider="stub",
+            pg_provider="stub",
             created_at=datetime(2026, 1, 15, tzinfo=timezone.utc),
         )
         db.add(payment)

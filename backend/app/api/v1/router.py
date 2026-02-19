@@ -25,6 +25,7 @@ from app.api.v1.response_library import router as response_library_router
 router = APIRouter(prefix="/api/v1")
 router.include_router(ab_tests_router)
 router.include_router(ai_personas_router)
+router.include_router(analytics_router)
 router.include_router(auth_router)
 router.include_router(bookings_router)
 router.include_router(clinics_router)

@@ -113,11 +113,15 @@ function ResponseLibraryTab() {
         ? newTags.split(",").map((t) => t.trim())
         : undefined,
     };
-    await createResponseLibrary(accessToken, data);
-    setNewQuestion("");
-    setNewAnswer("");
-    setNewTags("");
-    setShowCreate(false);
+    try {
+      await createResponseLibrary(accessToken, data);
+      setNewQuestion("");
+      setNewAnswer("");
+      setNewTags("");
+      setShowCreate(false);
+    } catch {
+      // errors propagate to UI via store error state
+    }
   };
 
   const startEdit = (entry: ResponseLibrary) => {
@@ -129,17 +133,22 @@ function ResponseLibraryTab() {
 
   const handleUpdate = async () => {
     if (!accessToken || !editingId) return;
-    await updateResponseLibrary(accessToken, editingId, {
-      question: editQuestion,
-      answer: editAnswer,
-      category: editCategory,
-    });
-    setEditingId(null);
+    try {
+      await updateResponseLibrary(accessToken, editingId, {
+        question: editQuestion,
+        answer: editAnswer,
+        category: editCategory,
+      });
+      setEditingId(null);
+    } catch {
+      // errors propagate to UI via store error state
+    }
   };
 
   const handleDelete = async (id: string) => {
     if (!accessToken) return;
-    await deleteResponseLibrary(accessToken, id);
+    if (!confirm("정말 삭제하시겠습니까?")) return;
+    await deleteResponseLibrary(accessToken, id).catch(() => {});
   };
 
   return (
@@ -441,16 +450,21 @@ function MedicalTermsTab() {
       description: newDescription.trim() || undefined,
       translations: newTranslations,
     };
-    await createMedicalTerm(accessToken, data);
-    setNewTermKo("");
-    setNewDescription("");
-    setNewTranslations({});
-    setShowCreate(false);
+    try {
+      await createMedicalTerm(accessToken, data);
+      setNewTermKo("");
+      setNewDescription("");
+      setNewTranslations({});
+      setShowCreate(false);
+    } catch {
+      // errors propagate to UI via store error state
+    }
   };
 
   const handleDelete = async (id: string) => {
     if (!accessToken) return;
-    await deleteMedicalTerm(accessToken, id);
+    if (!confirm("정말 삭제하시겠습니까?")) return;
+    await deleteMedicalTerm(accessToken, id).catch(() => {});
   };
 
   const translationLangs = [
