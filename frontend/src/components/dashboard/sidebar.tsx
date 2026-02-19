@@ -8,6 +8,7 @@ import {
   Receipt,
   Settings,
   LogOut,
+  BookOpen,
 } from "lucide-react";
 
 import { useAuthStore } from "@/stores/auth";
@@ -16,6 +17,7 @@ const NAV_ITEMS = [
   { icon: MessageSquare, label: "받은 메시지", href: "/" },
   { icon: Syringe, label: "시술 관리", href: "/procedures" },
   { icon: BarChart3, label: "통계", href: "/analytics" },
+  { icon: BookOpen, label: "지식 관리", href: "/knowledge" },
   { icon: Receipt, label: "정산", href: "/settlements" },
   { icon: Settings, label: "설정", href: "/settings" },
 ];

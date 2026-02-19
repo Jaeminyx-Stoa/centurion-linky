@@ -5,14 +5,18 @@ POST /api/webhooks/line/{account_id} — Incoming LINE events
 
 import uuid
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import get_db
+from app.core.database import async_session_factory, get_db
 from app.core.exceptions import NotFoundError, PermissionDeniedError
 from app.messenger.line import LineAdapter
 from app.models.messenger_account import MessengerAccount
+from app.services.ai_response_background import (
+    broadcast_incoming_message,
+    process_ai_response_background,
+)
 from app.services.message_service import MessageService
 
 router = APIRouter(prefix="/webhooks/line", tags=["webhooks"])
@@ -24,6 +28,7 @@ adapter = LineAdapter()
 async def line_webhook(
     account_id: uuid.UUID,
     request: Request,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ):
     """Handle incoming LINE webhook events."""
@@ -51,6 +56,20 @@ async def line_webhook(
 
     message_service = MessageService(db)
     for msg in messages:
-        await message_service.process_incoming(msg)
+        processing_result = await message_service.process_incoming(msg)
+
+        # Broadcast incoming message to staff dashboard
+        await broadcast_incoming_message(
+            processing_result.message, account.clinic_id
+        )
+
+        # Trigger AI auto-response for text messages
+        if msg.content_type == "text" and msg.content:
+            background_tasks.add_task(
+                process_ai_response_background,
+                message_id=processing_result.message.id,
+                conversation_id=processing_result.conversation.id,
+                session_factory=async_session_factory,
+            )
 
     return {"status": "ok"}

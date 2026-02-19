@@ -1,4 +1,5 @@
 import uuid
+from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from sqlalchemy import select
@@ -10,19 +11,28 @@ from app.models.customer import Customer
 from app.models.message import Message
 
 
+@dataclass
+class ProcessingResult:
+    """Result of processing an incoming message."""
+    message: Message
+    conversation: Conversation
+    customer: Customer
+    is_new_conversation: bool
+
+
 class MessageService:
     """Handles incoming messages from all messenger platforms."""
 
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def process_incoming(self, msg: StandardMessage) -> Message:
+    async def process_incoming(self, msg: StandardMessage) -> ProcessingResult:
         """Process an incoming message: upsert customer, upsert conversation, save message."""
         # 1. Customer upsert
         customer = await self._upsert_customer(msg)
 
         # 2. Conversation upsert
-        conversation = await self._get_or_create_conversation(msg, customer)
+        conversation, is_new = await self._get_or_create_conversation(msg, customer)
 
         # 3. Save message
         message = Message(
@@ -50,7 +60,12 @@ class MessageService:
 
         await self.db.flush()
 
-        return message
+        return ProcessingResult(
+            message=message,
+            conversation=conversation,
+            customer=customer,
+            is_new_conversation=is_new,
+        )
 
     async def _upsert_customer(self, msg: StandardMessage) -> Customer:
         """Find or create a customer by messenger identity."""
@@ -77,8 +92,8 @@ class MessageService:
 
     async def _get_or_create_conversation(
         self, msg: StandardMessage, customer: Customer
-    ) -> Conversation:
-        """Find active conversation or create a new one."""
+    ) -> tuple[Conversation, bool]:
+        """Find active conversation or create a new one. Returns (conversation, is_new)."""
         result = await self.db.execute(
             select(Conversation).where(
                 Conversation.customer_id == customer.id,
@@ -99,5 +114,6 @@ class MessageService:
             )
             self.db.add(conversation)
             await self.db.flush()
+            return conversation, True
 
-        return conversation
+        return conversation, False

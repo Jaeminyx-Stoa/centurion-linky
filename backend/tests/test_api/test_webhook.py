@@ -1,4 +1,5 @@
 import uuid
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from httpx import AsyncClient
@@ -41,8 +42,10 @@ async def telegram_account(db: AsyncSession, webhook_clinic: Clinic) -> Messenge
 class TestTelegramWebhook:
     """POST /api/webhooks/telegram/{account_id}"""
 
+    @patch("app.api.webhooks.telegram.broadcast_incoming_message", new_callable=AsyncMock)
+    @patch("app.api.webhooks.telegram.process_ai_response_background", new_callable=AsyncMock)
     async def test_webhook_processes_text_message(
-        self, client: AsyncClient, telegram_account: MessengerAccount
+        self, mock_ai_bg, mock_broadcast, client: AsyncClient, telegram_account: MessengerAccount
     ):
         payload = {
             "update_id": 123456789,
@@ -70,8 +73,10 @@ class TestTelegramWebhook:
         data = response.json()
         assert data["status"] == "ok"
 
+    @patch("app.api.webhooks.telegram.broadcast_incoming_message", new_callable=AsyncMock)
+    @patch("app.api.webhooks.telegram.process_ai_response_background", new_callable=AsyncMock)
     async def test_webhook_creates_customer_and_conversation(
-        self, client: AsyncClient, telegram_account: MessengerAccount
+        self, mock_ai_bg, mock_broadcast, client: AsyncClient, telegram_account: MessengerAccount
     ):
         payload = {
             "update_id": 123456789,
@@ -145,3 +150,66 @@ class TestTelegramWebhook:
             headers={"X-Telegram-Bot-Api-Secret-Token": "test-secret"},
         )
         assert response.status_code == 403
+
+    @patch("app.api.webhooks.telegram.broadcast_incoming_message", new_callable=AsyncMock)
+    @patch("app.api.webhooks.telegram.process_ai_response_background", new_callable=AsyncMock)
+    async def test_webhook_broadcasts_and_triggers_ai(
+        self,
+        mock_ai_bg,
+        mock_broadcast,
+        client: AsyncClient,
+        telegram_account: MessengerAccount,
+    ):
+        """Text messages should trigger WebSocket broadcast and AI background task."""
+        payload = {
+            "update_id": 999,
+            "message": {
+                "message_id": 100,
+                "from": {"id": 555666, "first_name": "Test"},
+                "chat": {"id": 555666, "type": "private"},
+                "date": 1700000000,
+                "text": "보톡스 가격 알려주세요",
+            },
+        }
+
+        response = await client.post(
+            f"/api/webhooks/telegram/{telegram_account.id}",
+            json=payload,
+            headers={"X-Telegram-Bot-Api-Secret-Token": "test-secret"},
+        )
+        assert response.status_code == 200
+
+        # WebSocket broadcast should have been called
+        mock_broadcast.assert_called_once()
+
+    @patch("app.api.webhooks.telegram.broadcast_incoming_message", new_callable=AsyncMock)
+    @patch("app.api.webhooks.telegram.process_ai_response_background", new_callable=AsyncMock)
+    async def test_image_message_skips_ai(
+        self,
+        mock_ai_bg,
+        mock_broadcast,
+        client: AsyncClient,
+        telegram_account: MessengerAccount,
+    ):
+        """Non-text messages (e.g. photos) should broadcast but not trigger AI."""
+        payload = {
+            "update_id": 1000,
+            "message": {
+                "message_id": 101,
+                "from": {"id": 777888, "first_name": "Photo"},
+                "chat": {"id": 777888, "type": "private"},
+                "date": 1700000000,
+                "photo": [{"file_id": "abc", "width": 100, "height": 100}],
+            },
+        }
+
+        response = await client.post(
+            f"/api/webhooks/telegram/{telegram_account.id}",
+            json=payload,
+            headers={"X-Telegram-Bot-Api-Secret-Token": "test-secret"},
+        )
+        assert response.status_code == 200
+
+        # Should broadcast but NOT trigger AI for image messages
+        mock_broadcast.assert_called_once()
+        mock_ai_bg.assert_not_called()
