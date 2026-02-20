@@ -7,9 +7,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.exceptions import NotFoundError
-from app.dependencies import get_current_user
+from app.core.pagination import paginate
+from app.dependencies import get_current_user, get_pagination
 from app.models.settlement import Settlement
 from app.models.user import User
+from app.schemas.pagination import PaginatedResponse, PaginationParams
 from app.schemas.settlement import SettlementGenerate, SettlementResponse
 from app.services.settlement_service import SettlementService
 
@@ -45,13 +47,14 @@ async def generate_settlement(
     return settlement
 
 
-@router.get("", response_model=list[SettlementResponse])
+@router.get("")
 async def list_settlements(
     year: int | None = Query(None),
     month: int | None = Query(None),
+    pagination: PaginationParams = Depends(get_pagination),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> PaginatedResponse[SettlementResponse]:
     """List settlements for the current clinic."""
     stmt = select(Settlement).where(
         Settlement.clinic_id == current_user.clinic_id
@@ -63,8 +66,7 @@ async def list_settlements(
     stmt = stmt.order_by(
         Settlement.period_year.desc(), Settlement.period_month.desc()
     )
-    result = await db.execute(stmt)
-    return result.scalars().all()
+    return await paginate(db, stmt, pagination)
 
 
 @router.get("/{settlement_id}", response_model=SettlementResponse)

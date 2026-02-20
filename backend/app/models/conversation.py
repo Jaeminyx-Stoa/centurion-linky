@@ -11,13 +11,13 @@ class Conversation(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "conversations"
 
     clinic_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("clinics.id"), nullable=False
+        ForeignKey("clinics.id"), nullable=False, index=True
     )
     customer_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("customers.id"), nullable=False
+        ForeignKey("customers.id"), nullable=False, index=True
     )
     messenger_account_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("messenger_accounts.id"), nullable=False
+        ForeignKey("messenger_accounts.id"), nullable=False, index=True
     )
 
     # Status

@@ -53,7 +53,7 @@ class MessageService:
         # 4. Update conversation metadata
         conversation.last_message_at = datetime.now(timezone.utc)
         conversation.last_message_preview = msg.content[:200] if msg.content else ""
-        conversation.unread_count = (conversation.unread_count or 0) + 1
+        conversation.unread_count = Conversation.unread_count + 1
 
         if conversation.status == "resolved":
             conversation.status = "active"

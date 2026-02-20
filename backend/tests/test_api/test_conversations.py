@@ -149,8 +149,9 @@ class TestListConversations:
         )
         assert response.status_code == 200
         data = response.json()
-        assert len(data) >= 1
-        assert data[0]["status"] == "active"
+        assert data["total"] >= 1
+        assert len(data["items"]) >= 1
+        assert data["items"][0]["status"] == "active"
 
     async def test_list_filters_by_status(
         self,
@@ -164,7 +165,8 @@ class TestListConversations:
         )
         assert response.status_code == 200
         data = response.json()
-        assert len(data) == 0
+        assert data["total"] == 0
+        assert data["items"] == []
 
     async def test_list_requires_auth(self, client: AsyncClient):
         response = await client.get("/api/v1/conversations")

@@ -160,7 +160,9 @@ class TestListEvents:
     ):
         resp = await client.get("/api/v1/crm/events", headers=crm_headers)
         assert resp.status_code == 200
-        assert len(resp.json()) == 4
+        data = resp.json()
+        assert data["total"] == 4
+        assert len(data["items"]) == 4
 
     @pytest.mark.asyncio
     async def test_filter_by_status(
@@ -171,8 +173,8 @@ class TestListEvents:
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert all(e["status"] == "scheduled" for e in data)
-        assert len(data) == 2
+        assert all(e["status"] == "scheduled" for e in data["items"])
+        assert len(data["items"]) == 2
 
     @pytest.mark.asyncio
     async def test_filter_by_event_type(
@@ -182,7 +184,7 @@ class TestListEvents:
             "/api/v1/crm/events?event_type=receipt", headers=crm_headers
         )
         assert resp.status_code == 200
-        assert len(resp.json()) == 1
+        assert resp.json()["total"] == 1
 
 
 class TestGetEvent:
@@ -284,7 +286,9 @@ class TestListSurveys:
         )
         resp = await client.get("/api/v1/crm/surveys", headers=crm_headers)
         assert resp.status_code == 200
-        assert len(resp.json()) >= 1
+        data = resp.json()
+        assert data["total"] >= 1
+        assert len(data["items"]) >= 1
 
     @pytest.mark.asyncio
     async def test_filter_by_round(
@@ -304,7 +308,7 @@ class TestListSurveys:
             "/api/v1/crm/surveys?survey_round=2", headers=crm_headers
         )
         assert resp.status_code == 200
-        assert all(s["survey_round"] == 2 for s in resp.json())
+        assert all(s["survey_round"] == 2 for s in resp.json()["items"])
 
 
 # --- Survey Summary ---

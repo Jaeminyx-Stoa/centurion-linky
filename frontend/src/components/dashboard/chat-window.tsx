@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Send, Bot, User, Shield } from "lucide-react";
+import { Send, Bot, User, Shield, ArrowLeft } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,7 +28,7 @@ export function ChatWindow() {
 
   if (!selectedId || !selectedDetail) {
     return (
-      <div className="flex flex-1 items-center justify-center text-muted-foreground">
+      <div className="hidden md:flex flex-1 items-center justify-center text-muted-foreground">
         <p>대화를 선택하세요</p>
       </div>
     );
@@ -55,11 +55,23 @@ export function ChatWindow() {
     if (accessToken) resolveConversation(accessToken, selectedId);
   };
 
+  const handleBack = () => {
+    useConversationStore.setState({ selectedId: null, selectedDetail: null });
+  };
+
   return (
     <div className="flex flex-1 flex-col">
       {/* Header */}
       <div className="flex items-center justify-between border-b px-4 py-2">
         <div className="flex items-center gap-2">
+          {/* Mobile back button */}
+          <button
+            onClick={handleBack}
+            aria-label="대화 목록으로 돌아가기"
+            className="flex md:hidden h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </button>
           <span className="text-sm font-medium">
             {selectedDetail.status === "active" ? "상담 중" : selectedDetail.status}
           </span>
@@ -70,14 +82,15 @@ export function ChatWindow() {
             size="sm"
             onClick={handleToggleAi}
             className="gap-1"
+            aria-label={selectedDetail.ai_mode ? "AI 모드 활성 - 수동 모드로 전환" : "수동 모드 활성 - AI 모드로 전환"}
           >
             {selectedDetail.ai_mode ? (
               <>
-                <Bot className="h-3.5 w-3.5" /> AI 모드
+                <Bot className="h-3.5 w-3.5" /> <span className="hidden sm:inline">AI 모드</span>
               </>
             ) : (
               <>
-                <User className="h-3.5 w-3.5" /> 수동 모드
+                <User className="h-3.5 w-3.5" /> <span className="hidden sm:inline">수동 모드</span>
               </>
             )}
           </Button>
@@ -87,8 +100,9 @@ export function ChatWindow() {
               size="sm"
               onClick={handleResolve}
               className="gap-1"
+              aria-label="대화 해결 처리"
             >
-              <Shield className="h-3.5 w-3.5" /> 해결
+              <Shield className="h-3.5 w-3.5" /> <span className="hidden sm:inline">해결</span>
             </Button>
           )}
         </div>
@@ -109,7 +123,7 @@ export function ChatWindow() {
               }`}
             >
               <div
-                className={`max-w-[70%] rounded-lg px-3 py-2 ${
+                className={`max-w-[85%] sm:max-w-[70%] rounded-lg px-3 py-2 ${
                   msg.sender_type === "customer"
                     ? "bg-muted"
                     : msg.sender_type === "ai"
@@ -159,11 +173,13 @@ export function ChatWindow() {
             onKeyDown={handleKeyDown}
             placeholder="메시지 입력..."
             disabled={selectedDetail.status === "resolved"}
+            aria-label="메시지 입력"
           />
           <Button
             onClick={handleSend}
             disabled={!input.trim() || selectedDetail.status === "resolved"}
             size="icon"
+            aria-label="메시지 보내기"
           >
             <Send className="h-4 w-4" />
           </Button>

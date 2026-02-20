@@ -1,19 +1,25 @@
 import { create } from "zustand";
 
-import { api } from "@/lib/api";
+import { api, buildPaginationParams } from "@/lib/api";
 import type { Settlement } from "@/types/settlement";
+import type { PaginatedResponse } from "@/types/api";
+import { DEFAULT_PAGE_SIZE } from "@/types/pagination";
 
 interface SettlementState {
   settlements: Settlement[];
   selectedSettlement: Settlement | null;
   isLoading: boolean;
   error: string | null;
+  page: number;
+  pageSize: number;
+  total: number;
 
   fetchSettlements: (
     token: string,
     year?: number,
     month?: number,
   ) => Promise<void>;
+  setPage: (page: number) => void;
   selectSettlement: (token: string, id: string) => Promise<void>;
   generateSettlement: (
     token: string,
@@ -28,23 +34,33 @@ export const useSettlementStore = create<SettlementState>((set, get) => ({
   selectedSettlement: null,
   isLoading: false,
   error: null,
+  page: 1,
+  pageSize: DEFAULT_PAGE_SIZE,
+  total: 0,
 
   fetchSettlements: async (token, year, month) => {
     set({ isLoading: true, error: null });
     try {
-      const params = new URLSearchParams();
+      const { page, pageSize } = get();
+      const pagination = buildPaginationParams(page, pageSize);
+      const params = new URLSearchParams(pagination.split("&").reduce((acc, p) => {
+        const [k, v] = p.split("=");
+        acc[k] = v;
+        return acc;
+      }, {} as Record<string, string>));
       if (year) params.set("year", String(year));
       if (month) params.set("month", String(month));
-      const qs = params.toString() ? `?${params.toString()}` : "";
-      const data = await api.get<Settlement[]>(
-        `/api/v1/settlements${qs}`,
+      const data = await api.get<PaginatedResponse<Settlement>>(
+        `/api/v1/settlements?${params.toString()}`,
         { token },
       );
-      set({ settlements: data, isLoading: false });
+      set({ settlements: data.items, total: data.total, isLoading: false });
     } catch {
       set({ isLoading: false, error: "Failed to load settlements" });
     }
   },
+
+  setPage: (page) => set({ page }),
 
   selectSettlement: async (token, id) => {
     const data = await api.get<Settlement>(`/api/v1/settlements/${id}`, {

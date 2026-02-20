@@ -1,5 +1,6 @@
 from app.models.ab_test import ABTest, ABTestResult, ABTestVariant
 from app.models.ai_persona import AIPersona
+from app.models.audit_log import AuditLog
 from app.models.base import Base
 from app.models.booking import Booking
 from app.models.clinic import Clinic
@@ -28,6 +29,7 @@ __all__ = [
     "ABTestResult",
     "ABTestVariant",
     "AIPersona",
+    "AuditLog",
     "Base",
     "Booking",
     "Clinic",

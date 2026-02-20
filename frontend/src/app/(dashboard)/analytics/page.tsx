@@ -639,17 +639,19 @@ export default function AnalyticsPage() {
   }
 
   return (
-    <div className="flex flex-1 overflow-hidden">
-      {/* Tab sidebar */}
-      <div className="flex w-[180px] flex-col border-r">
+    <div className="flex flex-1 flex-col md:flex-row overflow-hidden">
+      {/* Tab sidebar (desktop) */}
+      <div className="hidden md:flex w-[180px] flex-col border-r">
         <div className="border-b px-4 py-3">
           <h2 className="text-sm font-semibold">통계</h2>
         </div>
-        <nav className="flex-1 p-2">
+        <nav className="flex-1 p-2" aria-label="통계 탭">
           {TABS.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
               onClick={() => setActiveTab(id)}
+              role="tab"
+              aria-selected={activeTab === id}
               className={`flex w-full items-center gap-2 rounded px-3 py-2 text-sm transition-colors ${
                 activeTab === id
                   ? "bg-primary text-primary-foreground"
@@ -661,6 +663,26 @@ export default function AnalyticsPage() {
             </button>
           ))}
         </nav>
+      </div>
+
+      {/* Mobile tabs */}
+      <div className="flex overflow-x-auto border-b md:hidden" role="tablist" aria-label="통계 탭">
+        {TABS.map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            onClick={() => setActiveTab(id)}
+            role="tab"
+            aria-selected={activeTab === id}
+            className={`flex items-center gap-1 whitespace-nowrap px-4 py-2 text-sm ${
+              activeTab === id
+                ? "border-b-2 border-primary text-primary"
+                : "text-muted-foreground"
+            }`}
+          >
+            <Icon className="h-4 w-4" />
+            {label}
+          </button>
+        ))}
       </div>
 
       {/* Content */}

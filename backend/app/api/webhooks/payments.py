@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -5,6 +7,8 @@ from app.core.database import get_db
 from app.core.exceptions import PermissionDeniedError
 from app.payment.factory import PaymentProviderFactory
 from app.services.payment_service import PaymentService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/webhooks/payments", tags=["payment-webhooks"])
 
@@ -20,6 +24,10 @@ async def _handle_provider_webhook(
 
     is_valid = await provider.verify_webhook(body, headers)
     if not is_valid:
+        logger.warning(
+            "Payment webhook signature verification failed: provider=%s",
+            provider_type,
+        )
         raise PermissionDeniedError("Invalid webhook signature")
 
     payload = await request.json()
@@ -27,6 +35,12 @@ async def _handle_provider_webhook(
 
     service = PaymentService(db)
     payment = await service.handle_webhook(provider_type, payment_result)
+    logger.info(
+        "Payment webhook processed: provider=%s payment_id=%s status=%s",
+        provider_type,
+        payment.id,
+        payment.status,
+    )
     return {"status": "ok", "payment_id": str(payment.id)}
 
 

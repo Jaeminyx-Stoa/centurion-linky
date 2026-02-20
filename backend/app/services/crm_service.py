@@ -101,6 +101,23 @@ class CRMService:
         await self.db.flush()
         return event
 
+    async def mark_failed(
+        self, event_id: uuid.UUID, error: str | None = None
+    ) -> CRMEvent:
+        """Mark event as failed after execution error."""
+        result = await self.db.execute(
+            select(CRMEvent).where(CRMEvent.id == event_id)
+        )
+        event = result.scalar_one_or_none()
+        if event is None:
+            raise NotFoundError("CRM event not found")
+        event.status = "failed"
+        event.executed_at = datetime.now(timezone.utc)
+        if error:
+            event.response = {"error": error}
+        await self.db.flush()
+        return event
+
     async def cancel_remaining_for_booking(
         self, booking_id: uuid.UUID
     ) -> int:

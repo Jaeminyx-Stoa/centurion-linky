@@ -12,10 +12,10 @@ class Message(UUIDPrimaryKeyMixin, Base):
     __tablename__ = "messages"
 
     conversation_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("conversations.id"), nullable=False
+        ForeignKey("conversations.id"), nullable=False, index=True
     )
     clinic_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("clinics.id"), nullable=False
+        ForeignKey("clinics.id"), nullable=False, index=True
     )
 
     # Sender

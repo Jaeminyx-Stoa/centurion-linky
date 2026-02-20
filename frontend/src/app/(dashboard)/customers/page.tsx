@@ -6,8 +6,6 @@ import {
   Search,
   AlertCircle,
   X,
-  Mail,
-  Phone,
   Globe,
   Tag,
   Save,
@@ -24,6 +22,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ListSkeleton } from "@/components/shared/skeletons";
+import { PaginationControls } from "@/components/shared/pagination-controls";
 import type { Customer } from "@/types/customer";
 
 const MESSENGER_FILTERS = [
@@ -61,12 +61,13 @@ function CustomerDetail({
   };
 
   return (
-    <div className="flex w-[360px] flex-col border-l">
+    <div className="fixed inset-0 z-20 bg-background md:relative md:inset-auto md:z-auto md:w-[360px] flex flex-col border-l">
       <div className="flex items-center justify-between border-b px-4 py-3">
         <h3 className="text-sm font-semibold">고객 상세</h3>
         <button
           onClick={onClose}
           className="rounded p-1 hover:bg-muted"
+          aria-label="패널 닫기"
         >
           <X className="h-4 w-4" />
         </button>
@@ -173,7 +174,10 @@ function CustomerDetail({
 
 export default function CustomersPage() {
   const { accessToken } = useAuthStore();
-  const { customers, isLoading, error, fetchCustomers } = useCustomerStore();
+  const {
+    customers, isLoading, error, total, page, pageSize,
+    fetchCustomers, setPage,
+  } = useCustomerStore();
   const [search, setSearch] = useState("");
   const [messengerFilter, setMessengerFilter] = useState("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -182,7 +186,7 @@ export default function CustomersPage() {
     if (accessToken) {
       fetchCustomers(accessToken);
     }
-  }, [accessToken, fetchCustomers]);
+  }, [accessToken, fetchCustomers, page]);
 
   const filtered = customers.filter((c) => {
     const matchesSearch =
@@ -200,15 +204,6 @@ export default function CustomersPage() {
     ? customers.find((c) => c.id === selectedId) || null
     : null;
 
-  if (isLoading) {
-    return (
-      <div className="flex flex-1 items-center justify-center text-muted-foreground">
-        <Users className="mr-2 h-5 w-5 animate-pulse" />
-        고객 로딩 중...
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-1 overflow-hidden">
       <div className="flex flex-1 flex-col overflow-hidden">
@@ -220,7 +215,7 @@ export default function CustomersPage() {
               <h1 className="text-lg font-bold">고객 관리</h1>
             </div>
             <span className="text-sm text-muted-foreground">
-              {filtered.length}명
+              {total}명
             </span>
           </div>
           {/* Search */}
@@ -234,12 +229,13 @@ export default function CustomersPage() {
             />
           </div>
           {/* Messenger Filter */}
-          <div className="flex gap-2">
+          <div className="flex gap-2 overflow-x-auto">
             {MESSENGER_FILTERS.map((f) => (
               <button
                 key={f.id}
                 onClick={() => setMessengerFilter(f.id)}
-                className={`rounded-full px-3 py-1 text-xs transition-colors ${
+                aria-pressed={messengerFilter === f.id}
+                className={`whitespace-nowrap rounded-full px-3 py-1 text-xs transition-colors ${
                   messengerFilter === f.id
                     ? "bg-primary text-primary-foreground"
                     : "bg-muted hover:bg-muted/80"
@@ -260,7 +256,9 @@ export default function CustomersPage() {
 
         {/* List */}
         <div className="flex-1 overflow-y-auto">
-          {filtered.length === 0 ? (
+          {isLoading ? (
+            <ListSkeleton />
+          ) : filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center p-12 text-muted-foreground">
               <Users className="mb-2 h-8 w-8" />
               <p className="text-sm">고객이 없습니다</p>
@@ -316,6 +314,13 @@ export default function CustomersPage() {
             </div>
           )}
         </div>
+
+        <PaginationControls
+          page={page}
+          pageSize={pageSize}
+          total={total}
+          onPageChange={setPage}
+        />
       </div>
 
       {/* Detail Panel */}

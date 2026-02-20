@@ -393,6 +393,7 @@ function MessengerTab() {
                               }
                               className="rounded p-0.5 hover:bg-muted"
                               title="복사"
+                              aria-label="웹훅 URL 복사"
                             >
                               <Copy className="h-3 w-3 text-muted-foreground" />
                             </button>
@@ -413,12 +414,14 @@ function MessengerTab() {
                       <button
                         onClick={() => startEdit(account)}
                         className="rounded p-1 text-muted-foreground hover:bg-muted"
+                        aria-label="메신저 계정 수정"
                       >
                         <Pencil className="h-3.5 w-3.5" />
                       </button>
                       <button
                         onClick={() => handleDelete(account.id)}
                         className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                        aria-label="메신저 계정 삭제"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
@@ -555,6 +558,7 @@ function PersonaTab() {
                       <button
                         onClick={() => handleDelete(persona.id)}
                         className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                        aria-label="AI 페르소나 삭제"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
@@ -835,17 +839,19 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="flex flex-1 overflow-hidden">
-      {/* Tab sidebar */}
-      <div className="flex w-[200px] flex-col border-r">
+    <div className="flex flex-1 flex-col md:flex-row overflow-hidden">
+      {/* Tab sidebar (desktop) */}
+      <div className="hidden md:flex w-[200px] flex-col border-r">
         <div className="border-b px-4 py-3">
           <h2 className="text-sm font-semibold">설정</h2>
         </div>
-        <nav className="flex-1 p-2">
+        <nav className="flex-1 p-2" aria-label="설정 탭">
           {TABS.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
               onClick={() => setActiveTab(id)}
+              role="tab"
+              aria-selected={activeTab === id}
               className={`flex w-full items-center gap-2 rounded px-3 py-2 text-sm transition-colors ${
                 activeTab === id
                   ? "bg-primary text-primary-foreground"
@@ -857,6 +863,26 @@ export default function SettingsPage() {
             </button>
           ))}
         </nav>
+      </div>
+
+      {/* Mobile tabs */}
+      <div className="flex overflow-x-auto border-b md:hidden" role="tablist" aria-label="설정 탭">
+        {TABS.map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            onClick={() => setActiveTab(id)}
+            role="tab"
+            aria-selected={activeTab === id}
+            className={`flex items-center gap-1 whitespace-nowrap px-4 py-2 text-sm ${
+              activeTab === id
+                ? "border-b-2 border-primary text-primary"
+                : "text-muted-foreground"
+            }`}
+          >
+            <Icon className="h-4 w-4" />
+            {label}
+          </button>
+        ))}
       </div>
 
       {/* Content */}

@@ -1,6 +1,7 @@
 """WebSocket endpoint tests."""
 
 import uuid
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -95,11 +96,29 @@ class TestWebSocketAuth:
 # --- Broadcast tests (unit) ---
 
 class TestWebSocketBroadcast:
-    async def test_broadcast_skips_when_no_connections(self):
-        """Broadcasting to a clinic with no connections should not error."""
+    async def test_broadcast_publishes_to_redis(self):
+        """Broadcasting should publish message via Redis Pub/Sub."""
         mgr = ConnectionManager()
+        mock_redis = AsyncMock()
+        mgr._redis = mock_redis
+
+        clinic_id = uuid.uuid4()
+        data = {"type": "new_message", "conversation_id": str(uuid.uuid4())}
+        await mgr.broadcast_to_clinic(clinic_id, data)
+
+        mock_redis.publish.assert_called_once()
+        call_args = mock_redis.publish.call_args
+        assert f"ws:clinic:{clinic_id}" == call_args[0][0]
+
+    async def test_broadcast_falls_back_to_local_on_redis_error(self):
+        """If Redis publish fails, should fall back to local delivery."""
+        mgr = ConnectionManager()
+        mock_redis = AsyncMock()
+        mock_redis.publish.side_effect = Exception("Redis down")
+        mgr._redis = mock_redis
+
+        # Should not raise
         await mgr.broadcast_to_clinic(
             uuid.uuid4(),
             {"type": "new_message", "conversation_id": str(uuid.uuid4())},
         )
-        # No error means success

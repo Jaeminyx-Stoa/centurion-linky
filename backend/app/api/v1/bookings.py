@@ -7,7 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.exceptions import BadRequestError, NotFoundError
-from app.dependencies import get_current_user
+from app.core.pagination import paginate
+from app.dependencies import get_current_user, get_pagination
 from app.models.booking import Booking
 from app.models.user import User
 from app.schemas.booking import (
@@ -16,19 +17,24 @@ from app.schemas.booking import (
     BookingResponse,
     BookingUpdate,
 )
+from app.schemas.pagination import PaginatedResponse, PaginationParams
 
 router = APIRouter(prefix="/bookings", tags=["bookings"])
 
 
 async def _get_booking(
-    db: AsyncSession, booking_id: uuid.UUID, clinic_id: uuid.UUID
+    db: AsyncSession,
+    booking_id: uuid.UUID,
+    clinic_id: uuid.UUID,
+    for_update: bool = False,
 ) -> Booking:
-    result = await db.execute(
-        select(Booking).where(
-            Booking.id == booking_id,
-            Booking.clinic_id == clinic_id,
-        )
+    stmt = select(Booking).where(
+        Booking.id == booking_id,
+        Booking.clinic_id == clinic_id,
     )
+    if for_update:
+        stmt = stmt.with_for_update()
+    result = await db.execute(stmt)
     booking = result.scalar_one_or_none()
     if booking is None:
         raise NotFoundError("Booking not found")
@@ -68,17 +74,17 @@ async def create_booking(
     return booking
 
 
-@router.get("", response_model=list[BookingResponse])
+@router.get("")
 async def list_bookings(
     status: str | None = Query(None),
+    pagination: PaginationParams = Depends(get_pagination),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> PaginatedResponse[BookingResponse]:
     stmt = select(Booking).where(Booking.clinic_id == current_user.clinic_id)
     if status:
         stmt = stmt.where(Booking.status == status)
-    result = await db.execute(stmt)
-    return result.scalars().all()
+    return await paginate(db, stmt, pagination)
 
 
 @router.get("/{booking_id}", response_model=BookingResponse)
@@ -117,13 +123,20 @@ async def cancel_booking(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    booking = await _get_booking(db, booking_id, current_user.clinic_id)
+    booking = await _get_booking(db, booking_id, current_user.clinic_id, for_update=True)
     if booking.status in ("completed", "cancelled"):
         raise BadRequestError(
             f"Cannot cancel booking with status '{booking.status}'"
         )
     booking.status = "cancelled"
     booking.cancellation_reason = body.cancellation_reason
+
+    # Cancel remaining CRM events for this booking
+    from app.services.crm_service import CRMService
+
+    crm_service = CRMService(db)
+    await crm_service.cancel_remaining_for_booking(booking_id)
+
     await db.flush()
     await db.refresh(booking)
     return booking
@@ -135,7 +148,7 @@ async def complete_booking(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    booking = await _get_booking(db, booking_id, current_user.clinic_id)
+    booking = await _get_booking(db, booking_id, current_user.clinic_id, for_update=True)
     if booking.status != "confirmed":
         raise BadRequestError(
             "Only confirmed bookings can be completed"

@@ -61,9 +61,9 @@ class PaymentService:
     ) -> Payment:
         """Process a webhook callback from a PG provider. Idempotent."""
         result = await self.db.execute(
-            select(Payment).where(
-                Payment.pg_payment_id == payment_result.provider_payment_id
-            )
+            select(Payment)
+            .where(Payment.pg_payment_id == payment_result.provider_payment_id)
+            .with_for_update()
         )
         payment = result.scalar_one_or_none()
         if payment is None:
@@ -77,14 +77,20 @@ class PaymentService:
         payment.payment_method = payment_result.payment_method
         payment.paid_at = payment_result.paid_at
 
-        # If payment completed, confirm the linked booking
-        if payment_result.status == "completed" and payment.booking_id:
-            booking_result = await self.db.execute(
-                select(Booking).where(Booking.id == payment.booking_id)
-            )
-            booking = booking_result.scalar_one_or_none()
-            if booking and booking.status == "pending":
-                booking.status = "confirmed"
+        # If payment completed, confirm the linked booking and schedule CRM
+        if payment_result.status == "completed":
+            if payment.booking_id:
+                booking_result = await self.db.execute(
+                    select(Booking).where(Booking.id == payment.booking_id)
+                )
+                booking = booking_result.scalar_one_or_none()
+                if booking and booking.status == "pending":
+                    booking.status = "confirmed"
+
+            # Trigger CRM timeline scheduling asynchronously
+            from app.tasks.crm_execution import schedule_crm_for_payment
+
+            schedule_crm_for_payment.delay(str(payment.id))
 
         await self.db.flush()
         return payment

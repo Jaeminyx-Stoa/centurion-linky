@@ -6,9 +6,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.exceptions import NotFoundError
-from app.dependencies import get_current_user
+from app.core.pagination import paginate
+from app.dependencies import get_current_user, get_pagination
 from app.models.payment import Payment
 from app.models.user import User
+from app.schemas.pagination import PaginatedResponse, PaginationParams
 from app.schemas.payment import (
     PaymentCreateLink,
     PaymentRequestRemaining,
@@ -71,17 +73,17 @@ async def request_remaining(
     return payment
 
 
-@router.get("", response_model=list[PaymentResponse])
+@router.get("")
 async def list_payments(
     booking_id: uuid.UUID | None = Query(None),
+    pagination: PaginationParams = Depends(get_pagination),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> PaginatedResponse[PaymentResponse]:
     stmt = select(Payment).where(Payment.clinic_id == current_user.clinic_id)
     if booking_id:
         stmt = stmt.where(Payment.booking_id == booking_id)
-    result = await db.execute(stmt)
-    return result.scalars().all()
+    return await paginate(db, stmt, pagination)
 
 
 @router.get("/{payment_id}", response_model=PaymentResponse)

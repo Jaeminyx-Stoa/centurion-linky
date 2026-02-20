@@ -10,7 +10,7 @@ class AIPersona(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "ai_personas"
 
     clinic_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("clinics.id"), nullable=False
+        ForeignKey("clinics.id"), nullable=False, index=True
     )
 
     name: Mapped[str] = mapped_column(String(100), nullable=False)

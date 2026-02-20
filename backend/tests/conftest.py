@@ -1,6 +1,10 @@
 import asyncio
+import os
 import uuid
 from collections.abc import AsyncGenerator
+
+# Set test environment BEFORE any app imports so rate limiter etc. are disabled
+os.environ["APP_ENV"] = "test"
 
 import pytest
 from httpx import ASGITransport, AsyncClient

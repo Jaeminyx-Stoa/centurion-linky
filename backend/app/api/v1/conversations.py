@@ -1,12 +1,13 @@
 import uuid
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
 from app.core.exceptions import NotFoundError
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, get_pagination
 from app.models.conversation import Conversation
 from app.models.message import Message
 from app.models.user import User
@@ -16,6 +17,8 @@ from app.schemas.conversation import (
     MessageResponse,
     SendMessageRequest,
 )
+from app.schemas.pagination import PaginatedResponse, PaginationParams
+from app.services.audit_service import log_action
 
 router = APIRouter(prefix="/conversations", tags=["conversations"])
 
@@ -35,26 +38,41 @@ async def _get_conversation(
     return conv
 
 
-@router.get("", response_model=list[ConversationListResponse])
+@router.get("")
 async def list_conversations(
     status: str | None = Query(None),
+    pagination: PaginationParams = Depends(get_pagination),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-):
-    query = select(Conversation).where(
+) -> PaginatedResponse[ConversationListResponse]:
+    base_query = select(Conversation).where(
         Conversation.clinic_id == current_user.clinic_id,
-    ).order_by(Conversation.last_message_at.desc().nulls_last())
-
+    )
     if status:
-        query = query.where(Conversation.status == status)
+        base_query = base_query.where(Conversation.status == status)
+
+    # Count total
+    count_stmt = select(func.count()).select_from(base_query.subquery())
+    total = (await db.execute(count_stmt)).scalar() or 0
+
+    # Fetch page with eager loading to avoid N+1
+    query = (
+        base_query.options(
+            selectinload(Conversation.customer),
+            selectinload(Conversation.messenger_account),
+        )
+        .order_by(Conversation.last_message_at.desc().nulls_last())
+        .offset(pagination.offset)
+        .limit(pagination.limit)
+    )
 
     result = await db.execute(query)
     conversations = result.scalars().all()
 
     items = []
     for conv in conversations:
-        customer = await conv.awaitable_attrs.customer
-        account = await conv.awaitable_attrs.messenger_account
+        customer = conv.customer
+        account = conv.messenger_account
         items.append(ConversationListResponse(
             id=conv.id,
             clinic_id=conv.clinic_id,
@@ -73,7 +91,12 @@ async def list_conversations(
             customer_language=customer.language_code,
             messenger_type=account.messenger_type,
         ))
-    return items
+    return PaginatedResponse(
+        items=items,
+        total=total,
+        limit=pagination.limit,
+        offset=pagination.offset,
+    )
 
 
 @router.get("/{conversation_id}", response_model=ConversationDetailResponse)
@@ -141,11 +164,21 @@ async def toggle_ai(
     db: AsyncSession = Depends(get_db),
 ):
     conv = await _get_conversation(db, conversation_id, current_user.clinic_id)
+    old_mode = conv.ai_mode
     conv.ai_mode = not conv.ai_mode
     if not conv.ai_mode:
         conv.assigned_to = current_user.id
     else:
         conv.assigned_to = None
+    await log_action(
+        db,
+        clinic_id=current_user.clinic_id,
+        user_id=current_user.id,
+        action="toggle_ai",
+        resource_type="conversation",
+        resource_id=str(conv.id),
+        changes={"ai_mode": {"old": old_mode, "new": conv.ai_mode}},
+    )
     await db.flush()
     return conv
 

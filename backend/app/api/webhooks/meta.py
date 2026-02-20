@@ -4,21 +4,22 @@ GET  /api/webhooks/meta/{account_id} — Meta verification challenge
 POST /api/webhooks/meta/{account_id} — Incoming message events
 """
 
+import logging
 import uuid
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, Response
+from fastapi import APIRouter, Depends, Query, Request, Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import async_session_factory, get_db
+from app.core.database import get_db
 from app.core.exceptions import NotFoundError, PermissionDeniedError
 from app.messenger.factory import MessengerAdapterFactory
 from app.models.messenger_account import MessengerAccount
-from app.services.ai_response_background import (
-    broadcast_incoming_message,
-    process_ai_response_background,
-)
+from app.services.ai_response_background import broadcast_incoming_message
 from app.services.message_service import MessageService
+from app.tasks.ai_response import generate_ai_response
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/webhooks/meta", tags=["webhooks"])
 
@@ -56,7 +57,6 @@ async def meta_webhook_verify(
 async def meta_webhook_post(
     account_id: uuid.UUID,
     request: Request,
-    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ):
     """Handle incoming Meta webhook events (Instagram, Facebook, WhatsApp)."""
@@ -77,21 +77,40 @@ async def meta_webhook_post(
     messages = await adapter.parse_webhook(account, payload)
 
     message_service = MessageService(db)
+    processed = 0
+    failed = 0
     for msg in messages:
-        processing_result = await message_service.process_incoming(msg)
+        try:
+            processing_result = await message_service.process_incoming(msg)
 
-        # Broadcast incoming message to staff dashboard
-        await broadcast_incoming_message(
-            processing_result.message, account.clinic_id
-        )
-
-        # Trigger AI auto-response for text messages
-        if msg.content_type == "text" and msg.content:
-            background_tasks.add_task(
-                process_ai_response_background,
-                message_id=processing_result.message.id,
-                conversation_id=processing_result.conversation.id,
-                session_factory=async_session_factory,
+            # Broadcast incoming message to staff dashboard
+            await broadcast_incoming_message(
+                processing_result.message, account.clinic_id
             )
 
+            # Queue AI auto-response via Celery
+            if msg.content_type == "text" and msg.content:
+                generate_ai_response.delay(
+                    message_id=str(processing_result.message.id),
+                    conversation_id=str(processing_result.conversation.id),
+                    idempotency_key=f"meta-{processing_result.message.id}",
+                )
+            processed += 1
+        except Exception:
+            failed += 1
+            logger.exception(
+                "Meta webhook message processing failed: "
+                "provider=%s account_id=%s messenger_user=%s",
+                account.messenger_type,
+                account_id,
+                msg.messenger_user_id,
+            )
+
+    logger.info(
+        "Meta webhook processed: provider=%s account_id=%s processed=%d failed=%d",
+        account.messenger_type,
+        account_id,
+        processed,
+        failed,
+    )
     return {"status": "ok"}

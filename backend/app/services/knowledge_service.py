@@ -10,6 +10,8 @@ from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
+from app.core.query_utils import escape_like
+
 from app.models.clinic_procedure import ClinicProcedure
 from app.models.medical_term import MedicalTerm
 from app.models.procedure import Procedure
@@ -46,8 +48,8 @@ class KnowledgeService:
 
         conditions = [
             or_(
-                ResponseLibrary.question.ilike(f"%{kw}%"),
-                ResponseLibrary.answer.ilike(f"%{kw}%"),
+                ResponseLibrary.question.ilike(f"%{escape_like(kw)}%", escape="\\"),
+                ResponseLibrary.answer.ilike(f"%{escape_like(kw)}%", escape="\\"),
             )
             for kw in keywords
         ]
@@ -73,12 +75,13 @@ class KnowledgeService:
 
         conditions = []
         for kw in keywords:
+            escaped = escape_like(kw)
             conditions.append(
                 or_(
-                    Procedure.name_ko.ilike(f"%{kw}%"),
-                    Procedure.name_en.ilike(f"%{kw}%"),
-                    Procedure.name_ja.ilike(f"%{kw}%"),
-                    Procedure.description_ko.ilike(f"%{kw}%"),
+                    Procedure.name_ko.ilike(f"%{escaped}%", escape="\\"),
+                    Procedure.name_en.ilike(f"%{escaped}%", escape="\\"),
+                    Procedure.name_ja.ilike(f"%{escaped}%", escape="\\"),
+                    Procedure.description_ko.ilike(f"%{escaped}%", escape="\\"),
                 )
             )
 
@@ -117,7 +120,10 @@ class KnowledgeService:
         if not keywords:
             return []
 
-        conditions = [MedicalTerm.term_ko.ilike(f"%{kw}%") for kw in keywords]
+        conditions = [
+            MedicalTerm.term_ko.ilike(f"%{escape_like(kw)}%", escape="\\")
+            for kw in keywords
+        ]
 
         result = await self.db.execute(
             select(MedicalTerm)

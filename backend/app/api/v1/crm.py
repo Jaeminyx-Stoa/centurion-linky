@@ -2,16 +2,19 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.exceptions import BadRequestError, NotFoundError
-from app.dependencies import get_current_user
+from app.core.pagination import paginate
+from app.dependencies import get_current_user, get_pagination
 from app.models.crm_event import CRMEvent
 from app.models.satisfaction_survey import SatisfactionSurvey
 from app.models.user import User
 from app.schemas.crm_event import CRMEventResponse
+from app.schemas.pagination import PaginatedResponse, PaginationParams
+from app.services.audit_service import log_action
 from app.schemas.satisfaction_survey import (
     CRMDashboardResponse,
     SatisfactionSurveyCreate,
@@ -40,14 +43,15 @@ async def _get_event(
 
 # ==================== CRM Events ====================
 
-@router.get("/events", response_model=list[CRMEventResponse])
+@router.get("/events")
 async def list_events(
     status: str | None = Query(None),
     event_type: str | None = Query(None),
     customer_id: uuid.UUID | None = Query(None),
+    pagination: PaginationParams = Depends(get_pagination),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> PaginatedResponse[CRMEventResponse]:
     stmt = select(CRMEvent).where(CRMEvent.clinic_id == current_user.clinic_id)
     if status:
         stmt = stmt.where(CRMEvent.status == status)
@@ -56,8 +60,7 @@ async def list_events(
     if customer_id:
         stmt = stmt.where(CRMEvent.customer_id == customer_id)
     stmt = stmt.order_by(CRMEvent.scheduled_at.desc())
-    result = await db.execute(stmt)
-    return result.scalars().all()
+    return await paginate(db, stmt, pagination)
 
 
 @router.get("/events/{event_id}", response_model=CRMEventResponse)
@@ -81,6 +84,15 @@ async def cancel_event(
             f"Cannot cancel event with status '{event.status}'"
         )
     event.status = "cancelled"
+    await log_action(
+        db,
+        clinic_id=current_user.clinic_id,
+        user_id=current_user.id,
+        action="cancel",
+        resource_type="crm_event",
+        resource_id=str(event.id),
+        changes={"status": {"old": "scheduled", "new": "cancelled"}},
+    )
     await db.flush()
     await db.refresh(event)
     return event
@@ -88,13 +100,14 @@ async def cancel_event(
 
 # ==================== Surveys ====================
 
-@router.get("/surveys", response_model=list[SatisfactionSurveyResponse])
+@router.get("/surveys")
 async def list_surveys(
     survey_round: int | None = Query(None, ge=1, le=3),
     customer_id: uuid.UUID | None = Query(None),
+    pagination: PaginationParams = Depends(get_pagination),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> PaginatedResponse[SatisfactionSurveyResponse]:
     stmt = select(SatisfactionSurvey).where(
         SatisfactionSurvey.clinic_id == current_user.clinic_id
     )
@@ -103,8 +116,7 @@ async def list_surveys(
     if customer_id:
         stmt = stmt.where(SatisfactionSurvey.customer_id == customer_id)
     stmt = stmt.order_by(SatisfactionSurvey.created_at.desc())
-    result = await db.execute(stmt)
-    return result.scalars().all()
+    return await paginate(db, stmt, pagination)
 
 
 @router.post("/surveys", response_model=SatisfactionSurveyResponse, status_code=201)
@@ -176,23 +188,26 @@ async def survey_summary(
         else None
     )
 
-    # By round
-    by_round = {}
-    for r in (1, 2, 3):
-        round_result = await db.execute(
-            select(
-                func.count(SatisfactionSurvey.id),
-                func.avg(SatisfactionSurvey.satisfaction_score),
-            ).where(
-                SatisfactionSurvey.clinic_id == clinic_id,
-                SatisfactionSurvey.survey_round == r,
-            )
+    # By round (single query with group_by instead of 3 separate queries)
+    round_result = await db.execute(
+        select(
+            SatisfactionSurvey.survey_round,
+            func.count(SatisfactionSurvey.id),
+            func.avg(SatisfactionSurvey.satisfaction_score),
         )
-        row = round_result.one()
-        by_round[r] = {
-            "count": row[0],
-            "avg_score": round(float(row[1]), 2) if row[1] else None,
+        .where(SatisfactionSurvey.clinic_id == clinic_id)
+        .group_by(SatisfactionSurvey.survey_round)
+    )
+    by_round = {}
+    for row in round_result.all():
+        by_round[row[0]] = {
+            "count": row[1],
+            "avg_score": round(float(row[2]), 2) if row[2] else None,
         }
+    # Ensure all rounds present
+    for r in (1, 2, 3):
+        if r not in by_round:
+            by_round[r] = {"count": 0, "avg_score": None}
 
     return SurveySummaryResponse(
         total_surveys=total_surveys,
@@ -283,23 +298,31 @@ async def nps_stats(
     """NPS breakdown: promoters (9-10), passives (7-8), detractors (0-6)."""
     clinic_id = current_user.clinic_id
 
-    # Get all NPS scores
+    # Compute NPS breakdown in SQL (avoids loading all rows into memory)
     result = await db.execute(
-        select(SatisfactionSurvey.nps_score).where(
+        select(
+            func.count(SatisfactionSurvey.id).label("total"),
+            func.count(case(
+                (SatisfactionSurvey.nps_score >= 9, 1),
+            )).label("promoters"),
+            func.count(case(
+                (SatisfactionSurvey.nps_score.between(7, 8), 1),
+            )).label("passives"),
+            func.count(case(
+                (SatisfactionSurvey.nps_score <= 6, 1),
+            )).label("detractors"),
+        ).where(
             SatisfactionSurvey.clinic_id == clinic_id,
             SatisfactionSurvey.nps_score.isnot(None),
         )
     )
-    scores = [row[0] for row in result.all()]
+    row = result.one()
+    total = row.total
+    promoters = row.promoters
+    passives = row.passives
+    detractors = row.detractors
 
-    if not scores:
-        return {"promoters": 0, "passives": 0, "detractors": 0, "nps": None, "total": 0}
-
-    total = len(scores)
-    promoters = sum(1 for s in scores if s >= 9)
-    passives = sum(1 for s in scores if 7 <= s <= 8)
-    detractors = sum(1 for s in scores if s <= 6)
-    nps = round((promoters - detractors) / total * 100, 1)
+    nps = round((promoters - detractors) / total * 100, 1) if total else None
 
     return {
         "promoters": promoters,

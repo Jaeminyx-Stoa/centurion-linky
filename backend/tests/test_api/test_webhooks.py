@@ -131,9 +131,9 @@ class TestMetaWebhookPost:
 
     @pytest.mark.asyncio
     @patch("app.api.webhooks.meta.broadcast_incoming_message", new_callable=AsyncMock)
-    @patch("app.api.webhooks.meta.process_ai_response_background", new_callable=AsyncMock)
+    @patch("app.api.webhooks.meta.generate_ai_response")
     async def test_post_valid_ig_message(
-        self, mock_ai_bg, mock_broadcast, client: AsyncClient, ig_account: MessengerAccount
+        self, mock_ai_task, mock_broadcast, client: AsyncClient, ig_account: MessengerAccount
     ):
         payload = {
             "object": "instagram",
@@ -186,9 +186,9 @@ class TestLineWebhookPost:
 
     @pytest.mark.asyncio
     @patch("app.api.webhooks.line.broadcast_incoming_message", new_callable=AsyncMock)
-    @patch("app.api.webhooks.line.process_ai_response_background", new_callable=AsyncMock)
+    @patch("app.api.webhooks.line.generate_ai_response")
     async def test_post_valid_line_message(
-        self, mock_ai_bg, mock_broadcast, client: AsyncClient, line_account: MessengerAccount
+        self, mock_ai_task, mock_broadcast, client: AsyncClient, line_account: MessengerAccount
     ):
         import json
 
@@ -237,9 +237,9 @@ class TestKakaoWebhookPost:
 
     @pytest.mark.asyncio
     @patch("app.api.webhooks.kakao.broadcast_incoming_message", new_callable=AsyncMock)
-    @patch("app.api.webhooks.kakao.process_ai_response_background", new_callable=AsyncMock)
+    @patch("app.api.webhooks.kakao.generate_ai_response")
     async def test_post_valid_kakao_message(
-        self, mock_ai_bg, mock_broadcast, client: AsyncClient, kakao_account: MessengerAccount
+        self, mock_ai_task, mock_broadcast, client: AsyncClient, kakao_account: MessengerAccount
     ):
         payload = {
             "userRequest": {

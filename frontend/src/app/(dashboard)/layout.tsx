@@ -4,7 +4,8 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
 import { useAuthStore } from "@/stores/auth";
-import { Sidebar } from "@/components/dashboard/sidebar";
+import { Sidebar, MobileHeader } from "@/components/dashboard/sidebar";
+import { ErrorBoundary } from "@/components/shared/error-boundary";
 
 export default function DashboardLayout({
   children,
@@ -27,9 +28,12 @@ export default function DashboardLayout({
   if (!accessToken) return null;
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-screen flex-col md:flex-row overflow-hidden">
+      <MobileHeader />
       <Sidebar />
-      <main className="flex flex-1 overflow-hidden">{children}</main>
+      <main className="flex flex-1 overflow-hidden">
+        <ErrorBoundary>{children}</ErrorBoundary>
+      </main>
     </div>
   );
 }

@@ -183,6 +183,37 @@ class TestMarkSent:
         assert sent.executed_at is not None
 
 
+class TestMarkFailed:
+    @pytest.mark.asyncio
+    async def test_mark_failed(
+        self, db: AsyncSession, cs_payment: Payment
+    ):
+        service = CRMService(db)
+        events = await service.schedule_crm_timeline(cs_payment.id)
+
+        failed = await service.mark_failed(events[0].id, "Connection timeout")
+        assert failed.status == "failed"
+        assert failed.executed_at is not None
+        assert failed.response == {"error": "Connection timeout"}
+
+    @pytest.mark.asyncio
+    async def test_mark_failed_without_error(
+        self, db: AsyncSession, cs_payment: Payment
+    ):
+        service = CRMService(db)
+        events = await service.schedule_crm_timeline(cs_payment.id)
+
+        failed = await service.mark_failed(events[0].id)
+        assert failed.status == "failed"
+        assert failed.response is None
+
+    @pytest.mark.asyncio
+    async def test_mark_failed_not_found(self, db: AsyncSession):
+        service = CRMService(db)
+        with pytest.raises(Exception, match="CRM event not found"):
+            await service.mark_failed(uuid.uuid4())
+
+
 class TestCancelRemainingForBooking:
     @pytest.mark.asyncio
     async def test_cancels_all_scheduled(

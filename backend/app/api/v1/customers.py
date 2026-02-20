@@ -6,10 +6,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.exceptions import NotFoundError
-from app.dependencies import get_current_user
+from app.core.pagination import paginate
+from app.dependencies import get_current_user, get_pagination
 from app.models.customer import Customer
 from app.models.user import User
 from app.schemas.conversation import CustomerDetailResponse, CustomerUpdateRequest
+from app.schemas.pagination import PaginatedResponse, PaginationParams
 
 router = APIRouter(prefix="/customers", tags=["customers"])
 
@@ -29,17 +31,18 @@ async def _get_customer(
     return customer
 
 
-@router.get("", response_model=list[CustomerDetailResponse])
+@router.get("")
 async def list_customers(
+    pagination: PaginationParams = Depends(get_pagination),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-):
-    result = await db.execute(
+) -> PaginatedResponse[CustomerDetailResponse]:
+    stmt = (
         select(Customer)
         .where(Customer.clinic_id == current_user.clinic_id)
         .order_by(Customer.created_at.desc())
     )
-    return result.scalars().all()
+    return await paginate(db, stmt, pagination)
 
 
 @router.get("/{customer_id}", response_model=CustomerDetailResponse)

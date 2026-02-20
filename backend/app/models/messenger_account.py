@@ -12,7 +12,7 @@ class MessengerAccount(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "messenger_accounts"
 
     clinic_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("clinics.id"), nullable=False
+        ForeignKey("clinics.id"), nullable=False, index=True
     )
     messenger_type: Mapped[str] = mapped_column(String(20), nullable=False)
     # 'telegram','instagram','facebook','whatsapp','line','kakao'

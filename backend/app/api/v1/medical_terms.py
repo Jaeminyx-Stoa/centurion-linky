@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.exceptions import NotFoundError
+from app.core.query_utils import escape_like
 from app.dependencies import get_current_user
 from app.models.medical_term import MedicalTerm
 from app.models.user import User
@@ -71,7 +72,9 @@ async def list_medical_terms(
     if category:
         query = query.where(MedicalTerm.category == category)
     if q:
-        query = query.where(MedicalTerm.term_ko.contains(q))
+        query = query.where(
+            MedicalTerm.term_ko.ilike(f"%{escape_like(q)}%", escape="\\")
+        )
     result = await db.execute(query)
     return result.scalars().all()
 

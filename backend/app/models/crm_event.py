@@ -15,7 +15,7 @@ class CRMEvent(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         ForeignKey("clinics.id"), nullable=False, index=True
     )
     customer_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("customers.id"), nullable=False
+        ForeignKey("customers.id"), nullable=False, index=True
     )
     payment_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("payments.id"), nullable=True

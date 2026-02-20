@@ -178,7 +178,10 @@ class TestListBookings:
         resp = await client.get("/api/v1/bookings", headers=bk_headers)
         assert resp.status_code == 200
         data = resp.json()
-        assert len(data) >= 1
+        assert data["total"] >= 1
+        assert len(data["items"]) >= 1
+        assert "limit" in data
+        assert "offset" in data
 
     @pytest.mark.asyncio
     async def test_list_filter_by_status(
@@ -189,7 +192,7 @@ class TestListBookings:
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert all(b["status"] == "pending" for b in data)
+        assert all(b["status"] == "pending" for b in data["items"])
 
     @pytest.mark.asyncio
     async def test_list_filter_no_results(
@@ -199,7 +202,9 @@ class TestListBookings:
             "/api/v1/bookings?status=no_show", headers=bk_headers
         )
         assert resp.status_code == 200
-        assert resp.json() == []
+        data = resp.json()
+        assert data["items"] == []
+        assert data["total"] == 0
 
 
 class TestGetBooking:

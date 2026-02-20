@@ -43,9 +43,9 @@ class TestTelegramWebhook:
     """POST /api/webhooks/telegram/{account_id}"""
 
     @patch("app.api.webhooks.telegram.broadcast_incoming_message", new_callable=AsyncMock)
-    @patch("app.api.webhooks.telegram.process_ai_response_background", new_callable=AsyncMock)
+    @patch("app.api.webhooks.telegram.generate_ai_response")
     async def test_webhook_processes_text_message(
-        self, mock_ai_bg, mock_broadcast, client: AsyncClient, telegram_account: MessengerAccount
+        self, mock_ai_task, mock_broadcast, client: AsyncClient, telegram_account: MessengerAccount
     ):
         payload = {
             "update_id": 123456789,
@@ -74,9 +74,9 @@ class TestTelegramWebhook:
         assert data["status"] == "ok"
 
     @patch("app.api.webhooks.telegram.broadcast_incoming_message", new_callable=AsyncMock)
-    @patch("app.api.webhooks.telegram.process_ai_response_background", new_callable=AsyncMock)
+    @patch("app.api.webhooks.telegram.generate_ai_response")
     async def test_webhook_creates_customer_and_conversation(
-        self, mock_ai_bg, mock_broadcast, client: AsyncClient, telegram_account: MessengerAccount
+        self, mock_ai_task, mock_broadcast, client: AsyncClient, telegram_account: MessengerAccount
     ):
         payload = {
             "update_id": 123456789,
@@ -152,15 +152,15 @@ class TestTelegramWebhook:
         assert response.status_code == 403
 
     @patch("app.api.webhooks.telegram.broadcast_incoming_message", new_callable=AsyncMock)
-    @patch("app.api.webhooks.telegram.process_ai_response_background", new_callable=AsyncMock)
+    @patch("app.api.webhooks.telegram.generate_ai_response")
     async def test_webhook_broadcasts_and_triggers_ai(
         self,
-        mock_ai_bg,
+        mock_ai_task,
         mock_broadcast,
         client: AsyncClient,
         telegram_account: MessengerAccount,
     ):
-        """Text messages should trigger WebSocket broadcast and AI background task."""
+        """Text messages should trigger WebSocket broadcast and Celery AI task."""
         payload = {
             "update_id": 999,
             "message": {
@@ -182,11 +182,14 @@ class TestTelegramWebhook:
         # WebSocket broadcast should have been called
         mock_broadcast.assert_called_once()
 
+        # Celery task should have been dispatched
+        mock_ai_task.delay.assert_called_once()
+
     @patch("app.api.webhooks.telegram.broadcast_incoming_message", new_callable=AsyncMock)
-    @patch("app.api.webhooks.telegram.process_ai_response_background", new_callable=AsyncMock)
+    @patch("app.api.webhooks.telegram.generate_ai_response")
     async def test_image_message_skips_ai(
         self,
-        mock_ai_bg,
+        mock_ai_task,
         mock_broadcast,
         client: AsyncClient,
         telegram_account: MessengerAccount,
@@ -212,4 +215,4 @@ class TestTelegramWebhook:
 
         # Should broadcast but NOT trigger AI for image messages
         mock_broadcast.assert_called_once()
-        mock_ai_bg.assert_not_called()
+        mock_ai_task.delay.assert_not_called()

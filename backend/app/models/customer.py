@@ -25,7 +25,7 @@ class Customer(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
 
     clinic_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("clinics.id"), nullable=False
+        ForeignKey("clinics.id"), nullable=False, index=True
     )
 
     # Messenger identification

@@ -31,19 +31,26 @@ const LANGUAGE_NAMES: Record<string, string> = {
   ko: "\uD55C\uAD6D\uC5B4",
 };
 
+const SATISFACTION_LABELS: Record<string, string> = {
+  green: "\uC88B\uC74C",
+  yellow: "\uBCF4\uD1B5",
+  orange: "\uC8FC\uC758",
+  red: "\uB098\uC068",
+};
+
 export function CustomerPanel() {
   const { customer, selectedDetail } = useConversationStore();
 
   if (!customer || !selectedDetail) {
     return (
-      <div className="flex w-[320px] items-center justify-center border-l text-sm text-muted-foreground">
+      <div className="hidden lg:flex w-[320px] items-center justify-center border-l text-sm text-muted-foreground">
         고객 정보 없음
       </div>
     );
   }
 
   return (
-    <div className="flex w-[320px] flex-col border-l overflow-y-auto">
+    <div className="hidden lg:flex w-[320px] flex-col border-l overflow-y-auto">
       {/* Profile */}
       <div className="border-b p-4">
         <div className="flex items-center gap-3">
@@ -123,11 +130,17 @@ export function CustomerPanel() {
                   red: "bg-red-500",
                 }[selectedDetail.satisfaction_level || ""] || "bg-gray-300"
               }`}
+              aria-hidden="true"
             />
             <span className="text-lg font-bold">
               {selectedDetail.satisfaction_score}
             </span>
             <span className="text-sm text-muted-foreground">/ 100</span>
+            {selectedDetail.satisfaction_level && (
+              <span className="sr-only">
+                ({SATISFACTION_LABELS[selectedDetail.satisfaction_level] || ""})
+              </span>
+            )}
           </div>
         </div>
       )}

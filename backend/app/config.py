@@ -1,3 +1,4 @@
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -53,9 +54,42 @@ class Settings(BaseSettings):
     ai_temperature: float = 0.7
     ai_max_tokens: int = 1024
 
+    # Azure Blob Storage
+    azure_storage_connection_string: str = ""
+    azure_storage_container: str = "uploads"
+
+    # Rate limiting
+    rate_limit_default: str = "100/minute"
+    rate_limit_auth: str = "10/minute"
+
+    # Body size limit
+    max_body_size_mb: int = 10
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",")]
+
+    @model_validator(mode="after")
+    def validate_production(self) -> "Settings":
+        if self.app_env == "production":
+            if self.jwt_secret_key == "change-me-to-a-random-secret-key":
+                raise ValueError("JWT secret key must be changed in production")
+            if self.app_debug:
+                raise ValueError("Debug mode must be disabled in production")
+            if "localhost" in self.database_url:
+                raise ValueError("Database URL must not point to localhost in production")
+            if "localhost" in self.redis_url:
+                raise ValueError("Redis URL must not point to localhost in production")
+            if "guest:guest" in self.rabbitmq_url:
+                raise ValueError("RabbitMQ must not use default credentials in production")
+            if "localhost" in self.cors_origins:
+                raise ValueError("CORS origins must not include localhost in production")
+            if not any([self.anthropic_api_key, self.azure_openai_api_key, self.google_api_key]):
+                raise ValueError("At least one AI API key must be configured in production")
+        # Cross-field: if Azure OpenAI key set, endpoint must also be set
+        if self.azure_openai_api_key and not self.azure_openai_endpoint:
+            raise ValueError("Azure OpenAI endpoint is required when API key is set")
+        return self
 
 
 settings = Settings()

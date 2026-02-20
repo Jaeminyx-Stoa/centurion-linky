@@ -1,3 +1,5 @@
+import copy
+
 from fastapi import APIRouter, Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -34,8 +36,8 @@ async def update_payment_settings(
     )
     clinic = result.scalar_one()
 
-    # Merge update into existing settings
-    current = dict(clinic.settings)
+    # Merge update into existing settings (deep copy to trigger JSONB change detection)
+    current = copy.deepcopy(clinic.settings)
     payment = current.get("payment", {})
     update_data = body.model_dump(exclude_unset=True)
     payment.update(update_data)

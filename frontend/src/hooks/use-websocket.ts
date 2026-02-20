@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 import { useAuthStore } from "@/stores/auth";
 import { useConversationStore } from "@/stores/conversation";
@@ -11,16 +11,27 @@ const WS_BASE_URL =
     .replace("http://", "ws://")
     .replace("https://", "wss://");
 
+const MAX_RETRIES = 5;
+const BASE_DELAY_MS = 3000;
+const MAX_DELAY_MS = 30000;
+
 export function useWebSocket() {
   const { accessToken } = useAuthStore();
   const { onNewMessage, onConversationUpdate } = useConversationStore();
   const wsRef = useRef<WebSocket | null>(null);
+  const retriesRef = useRef(0);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => {
+  const connect = useCallback(() => {
     if (!accessToken) return;
+    if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
     const ws = new WebSocket(`${WS_BASE_URL}/ws?token=${accessToken}`);
     wsRef.current = ws;
+
+    ws.onopen = () => {
+      retriesRef.current = 0;
+    };
 
     ws.onmessage = (event) => {
       try {
@@ -48,18 +59,35 @@ export function useWebSocket() {
       }
     };
 
-    ws.onclose = () => {
-      // Auto-reconnect after 3s
-      setTimeout(() => {
-        if (wsRef.current === ws) {
-          wsRef.current = null;
-        }
-      }, 3000);
+    ws.onerror = () => {
+      // Error is followed by close event; reconnect logic lives there
     };
 
-    return () => {
-      ws.close();
+    ws.onclose = () => {
       wsRef.current = null;
+
+      if (retriesRef.current < MAX_RETRIES) {
+        const delay = Math.min(
+          BASE_DELAY_MS * Math.pow(2, retriesRef.current),
+          MAX_DELAY_MS,
+        );
+        retriesRef.current += 1;
+        reconnectTimerRef.current = setTimeout(connect, delay);
+      }
     };
   }, [accessToken, onNewMessage, onConversationUpdate]);
+
+  useEffect(() => {
+    connect();
+
+    return () => {
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
+      retriesRef.current = MAX_RETRIES; // prevent reconnect during cleanup
+      wsRef.current?.close();
+      wsRef.current = null;
+    };
+  }, [connect]);
 }

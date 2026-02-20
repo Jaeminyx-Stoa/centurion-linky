@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from jwt.exceptions import InvalidTokenError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,6 +15,8 @@ from app.core.security import (
     verify_password,
 )
 from app.dependencies import get_current_user
+from app.middleware.rate_limit import limiter
+from app.services.audit_service import log_action
 from app.models.clinic import Clinic
 from app.models.user import User
 from app.schemas.auth import (
@@ -29,7 +31,12 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post("/register", response_model=TokenResponse, status_code=201)
-async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
+@limiter.limit("10/minute")
+async def register(
+    request: Request,
+    body: RegisterRequest,
+    db: AsyncSession = Depends(get_db),
+):
     # Check duplicate slug
     existing_clinic = await db.execute(
         select(Clinic).where(Clinic.slug == body.clinic_slug)
@@ -74,12 +81,23 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
+@limiter.limit("10/minute")
+async def login(request: Request, body: LoginRequest, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.email == body.email))
     user = result.scalar_one_or_none()
 
     if user is None or not verify_password(body.password, user.password_hash):
         raise UnauthorizedError("Invalid email or password")
+
+    await log_action(
+        db,
+        clinic_id=user.clinic_id,
+        user_id=user.id,
+        action="login",
+        resource_type="user",
+        resource_id=str(user.id),
+        request=request,
+    )
 
     token_data = {"sub": str(user.id)}
     return TokenResponse(
@@ -89,7 +107,8 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/refresh", response_model=TokenResponse)
-async def refresh(body: RefreshRequest, db: AsyncSession = Depends(get_db)):
+@limiter.limit("10/minute")
+async def refresh(request: Request, body: RefreshRequest, db: AsyncSession = Depends(get_db)):
     try:
         payload = decode_token(body.refresh_token)
         if payload.get("type") != "refresh":

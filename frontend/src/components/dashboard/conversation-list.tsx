@@ -5,6 +5,7 @@ import { MessageSquare } from "lucide-react";
 
 import { useAuthStore } from "@/stores/auth";
 import { useConversationStore } from "@/stores/conversation";
+import { PaginationControls } from "@/components/shared/pagination-controls";
 
 const COUNTRY_FLAGS: Record<string, string> = {
   JP: "\uD83C\uDDEF\uD83C\uDDF5",
@@ -24,6 +25,13 @@ const SATISFACTION_COLORS: Record<string, string> = {
   red: "bg-red-500",
 };
 
+const SATISFACTION_LABELS: Record<string, string> = {
+  green: "좋음",
+  yellow: "보통",
+  orange: "주의",
+  red: "나쁨",
+};
+
 const MESSENGER_LABELS: Record<string, string> = {
   telegram: "TG",
   line: "LINE",
@@ -38,7 +46,11 @@ export function ConversationList() {
   const {
     conversations,
     selectedId,
+    total,
+    page,
+    pageSize,
     fetchConversations,
+    setPage,
     selectConversation,
   } = useConversationStore();
 
@@ -46,7 +58,7 @@ export function ConversationList() {
     if (accessToken) {
       fetchConversations(accessToken);
     }
-  }, [accessToken, fetchConversations]);
+  }, [accessToken, fetchConversations, page]);
 
   const handleSelect = (id: string) => {
     if (accessToken) {
@@ -55,17 +67,21 @@ export function ConversationList() {
   };
 
   return (
-    <div className="flex w-[280px] flex-col border-r">
+    <div
+      className={`flex w-full md:w-[280px] flex-col border-r ${
+        selectedId ? "hidden md:flex" : "flex"
+      }`}
+    >
       {/* Header */}
       <div className="border-b px-4 py-3">
         <h2 className="text-sm font-semibold">받은 메시지</h2>
         <p className="text-xs text-muted-foreground">
-          {conversations.length}개 대화
+          {total}개 대화
         </p>
       </div>
 
       {/* List */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto" role="listbox" aria-label="대화 목록">
         {conversations.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-8 text-muted-foreground">
             <MessageSquare className="mb-2 h-8 w-8" />
@@ -75,6 +91,8 @@ export function ConversationList() {
           conversations.map((conv) => (
             <button
               key={conv.id}
+              role="option"
+              aria-selected={selectedId === conv.id}
               onClick={() => handleSelect(conv.id)}
               className={`flex w-full items-start gap-3 border-b px-4 py-3 text-left transition-colors ${
                 selectedId === conv.id
@@ -104,10 +122,15 @@ export function ConversationList() {
                         className={`h-2 w-2 rounded-full ${
                           SATISFACTION_COLORS[conv.satisfaction_level] || ""
                         }`}
+                        title={SATISFACTION_LABELS[conv.satisfaction_level] || ""}
+                        aria-label={`만족도: ${SATISFACTION_LABELS[conv.satisfaction_level] || "알 수 없음"}`}
                       />
                     )}
                     {conv.unread_count > 0 && (
-                      <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] text-primary-foreground">
+                      <span
+                        className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] text-primary-foreground"
+                        aria-label={`읽지 않은 메시지 ${conv.unread_count}개`}
+                      >
                         {conv.unread_count}
                       </span>
                     )}
@@ -133,6 +156,12 @@ export function ConversationList() {
           ))
         )}
       </div>
+      <PaginationControls
+        page={page}
+        pageSize={pageSize}
+        total={total}
+        onPageChange={setPage}
+      />
     </div>
   );
 }

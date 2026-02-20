@@ -1,12 +1,14 @@
 import { create } from "zustand";
 
-import { api } from "@/lib/api";
+import { api, buildPaginationParams } from "@/lib/api";
 import type {
   Conversation,
   ConversationDetail,
   Customer,
   Message,
 } from "@/types/conversation";
+import type { PaginatedResponse } from "@/types/api";
+import { DEFAULT_PAGE_SIZE } from "@/types/pagination";
 
 interface ConversationState {
   conversations: Conversation[];
@@ -15,8 +17,12 @@ interface ConversationState {
   messages: Message[];
   customer: Customer | null;
   isLoading: boolean;
+  page: number;
+  pageSize: number;
+  total: number;
 
   fetchConversations: (token: string, status?: string) => Promise<void>;
+  setPage: (page: number) => void;
   selectConversation: (token: string, id: string) => Promise<void>;
   fetchMessages: (token: string, conversationId: string) => Promise<void>;
   fetchCustomer: (token: string, customerId: string) => Promise<void>;
@@ -36,15 +42,22 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
   messages: [],
   customer: null,
   isLoading: false,
+  page: 1,
+  pageSize: DEFAULT_PAGE_SIZE,
+  total: 0,
 
   fetchConversations: async (token, status) => {
-    const params = status ? `?status=${status}` : "";
-    const data = await api.get<Conversation[]>(
-      `/api/v1/conversations${params}`,
+    const { page, pageSize } = get();
+    const pagination = buildPaginationParams(page, pageSize);
+    const statusParam = status ? `&status=${status}` : "";
+    const data = await api.get<PaginatedResponse<Conversation>>(
+      `/api/v1/conversations?${pagination}${statusParam}`,
       { token },
     );
-    set({ conversations: data });
+    set({ conversations: data.items, total: data.total });
   },
+
+  setPage: (page) => set({ page }),
 
   selectConversation: async (token, id) => {
     set({ selectedId: id, isLoading: true });

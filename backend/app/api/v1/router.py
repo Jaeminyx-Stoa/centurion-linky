@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from app.api.v1.ab_tests import router as ab_tests_router
 from app.api.v1.analytics import router as analytics_router
+from app.api.v1.audit import router as audit_router
 from app.api.v1.ai_personas import router as ai_personas_router
 from app.api.v1.auth import router as auth_router
 from app.api.v1.clinics import router as clinics_router
@@ -21,10 +22,12 @@ from app.api.v1.simulations import router as simulations_router
 from app.api.v1.procedure_categories import router as procedure_categories_router
 from app.api.v1.procedures import router as procedures_router
 from app.api.v1.response_library import router as response_library_router
+from app.api.v1.uploads import router as uploads_router
 
 router = APIRouter(prefix="/api/v1")
 router.include_router(ab_tests_router)
 router.include_router(ai_personas_router)
+router.include_router(audit_router)
 router.include_router(analytics_router)
 router.include_router(auth_router)
 router.include_router(bookings_router)
@@ -44,3 +47,4 @@ router.include_router(simulations_router)
 router.include_router(procedure_categories_router)
 router.include_router(procedures_router)
 router.include_router(response_library_router)
+router.include_router(uploads_router)

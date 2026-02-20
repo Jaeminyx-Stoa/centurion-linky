@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.cache import cache_get, cache_set
 from app.core.database import get_db
 from app.core.exceptions import NotFoundError
 from app.dependencies import get_current_user
@@ -24,6 +25,12 @@ async def get_overview(
     db: AsyncSession = Depends(get_db),
 ):
     clinic_id = current_user.clinic_id
+    cache_key = f"analytics:overview:{clinic_id}"
+
+    # Check cache first
+    cached = await cache_get(cache_key)
+    if cached:
+        return AnalyticsOverviewResponse(**cached)
 
     # Conversations
     conv_result = await db.execute(
@@ -51,13 +58,17 @@ async def get_overview(
     )
     total_payments = payment_result.scalar() or 0
 
-    return AnalyticsOverviewResponse(
+    result = AnalyticsOverviewResponse(
         total_conversations=conv_row.total,
         active_conversations=conv_row.active,
         resolved_conversations=conv_row.resolved,
         total_bookings=total_bookings,
         total_payments=total_payments,
     )
+
+    # Cache for 5 minutes
+    await cache_set(cache_key, result.model_dump(), ttl_seconds=300)
+    return result
 
 
 @router.get(

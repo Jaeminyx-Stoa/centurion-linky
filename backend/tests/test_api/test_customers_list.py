@@ -77,14 +77,17 @@ class TestListCustomers:
         resp = await client.get("/api/v1/customers", headers=cust_headers)
         assert resp.status_code == 200
         data = resp.json()
-        assert len(data) == 3
+        assert data["total"] == 3
+        assert len(data["items"]) == 3
 
     async def test_list_customers_empty(
         self, client: AsyncClient, cust_headers: dict
     ):
         resp = await client.get("/api/v1/customers", headers=cust_headers)
         assert resp.status_code == 200
-        assert resp.json() == []
+        data = resp.json()
+        assert data["items"] == []
+        assert data["total"] == 0
 
     async def test_list_customers_only_own_clinic(
         self,
@@ -111,4 +114,4 @@ class TestListCustomers:
         resp = await client.get("/api/v1/customers", headers=cust_headers)
         assert resp.status_code == 200
         data = resp.json()
-        assert len(data) == 3  # only own clinic's customers
+        assert data["total"] == 3  # only own clinic's customers

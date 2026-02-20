@@ -230,7 +230,9 @@ class TestListPayments:
     ):
         resp = await client.get("/api/v1/payments", headers=pay_headers)
         assert resp.status_code == 200
-        assert len(resp.json()) >= 1
+        data = resp.json()
+        assert data["total"] >= 1
+        assert len(data["items"]) >= 1
 
     @pytest.mark.asyncio
     async def test_list_filter_by_booking(
@@ -246,8 +248,8 @@ class TestListPayments:
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert len(data) >= 1
-        assert all(p["booking_id"] == str(pay_booking.id) for p in data)
+        assert len(data["items"]) >= 1
+        assert all(p["booking_id"] == str(pay_booking.id) for p in data["items"])
 
 
 class TestGetPayment:

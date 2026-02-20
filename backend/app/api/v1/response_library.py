@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.exceptions import NotFoundError
+from app.core.query_utils import escape_like
 from app.dependencies import get_current_user
 from app.models.response_library import ResponseLibrary
 from app.models.user import User
@@ -67,7 +68,9 @@ async def list_response_library(
     if category:
         query = query.where(ResponseLibrary.category == category)
     if q:
-        query = query.where(ResponseLibrary.question.contains(q))
+        query = query.where(
+            ResponseLibrary.question.ilike(f"%{escape_like(q)}%", escape="\\")
+        )
     result = await db.execute(query)
     return result.scalars().all()
 

@@ -8,6 +8,7 @@ import {
   Banknote,
   AlertCircle,
   Plus,
+  ArrowLeft,
 } from "lucide-react";
 
 import { useAuthStore } from "@/stores/auth";
@@ -19,6 +20,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { ListSkeleton } from "@/components/shared/skeletons";
+import { PaginationControls } from "@/components/shared/pagination-controls";
 import type { Settlement } from "@/types/settlement";
 
 const STATUS_CONFIG: Record<
@@ -200,7 +203,11 @@ export default function SettlementsPage() {
     selectedSettlement,
     isLoading,
     error,
+    total,
+    page,
+    pageSize,
     fetchSettlements,
+    setPage,
     selectSettlement,
     generateSettlement,
     confirmSettlement,
@@ -215,7 +222,7 @@ export default function SettlementsPage() {
     if (accessToken) {
       fetchSettlements(accessToken, filterYear);
     }
-  }, [accessToken, filterYear, fetchSettlements]);
+  }, [accessToken, filterYear, fetchSettlements, page]);
 
   const handleGenerate = () => {
     if (!accessToken) return;
@@ -238,15 +245,19 @@ export default function SettlementsPage() {
     }
   };
 
+  const handleBack = () => {
+    useSettlementStore.setState({ selectedSettlement: null });
+  };
+
   return (
     <div className="flex flex-1 overflow-hidden">
       {/* Left: Settlement List */}
-      <div className="flex w-[360px] flex-col border-r">
+      <div className={`flex w-full md:w-[360px] flex-col border-r ${selectedSettlement ? "hidden md:flex" : "flex"}`}>
         <div className="flex items-center justify-between border-b px-4 py-3">
           <div>
             <h2 className="text-sm font-semibold">정산 관리</h2>
             <p className="text-xs text-muted-foreground">
-              {settlements.length}건
+              {total}건
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -275,10 +286,7 @@ export default function SettlementsPage() {
 
         <div className="flex-1 overflow-y-auto">
           {isLoading ? (
-            <div className="flex items-center justify-center p-8 text-muted-foreground">
-              <Receipt className="mr-2 h-5 w-5 animate-pulse" />
-              로딩 중...
-            </div>
+            <ListSkeleton />
           ) : settlements.length === 0 ? (
             <div className="flex flex-col items-center justify-center p-8 text-muted-foreground">
               <Receipt className="mb-2 h-8 w-8" />
@@ -297,10 +305,16 @@ export default function SettlementsPage() {
             ))
           )}
         </div>
+        <PaginationControls
+          page={page}
+          pageSize={pageSize}
+          total={total}
+          onPageChange={setPage}
+        />
       </div>
 
       {/* Right: Settlement Detail */}
-      <div className="flex flex-1 flex-col overflow-y-auto p-6">
+      <div className={`flex-1 flex-col overflow-y-auto p-6 ${selectedSettlement ? "flex" : "hidden md:flex"}`}>
         {error && (
           <div className="mb-4 flex items-center gap-2 rounded bg-destructive/10 p-3 text-sm text-destructive">
             <AlertCircle className="h-4 w-4" />
@@ -308,11 +322,21 @@ export default function SettlementsPage() {
           </div>
         )}
         {selectedSettlement ? (
-          <SettlementDetail
-            settlement={selectedSettlement}
-            onConfirm={handleConfirm}
-            onMarkPaid={handleMarkPaid}
-          />
+          <div className="space-y-4">
+            <button
+              onClick={handleBack}
+              aria-label="정산 목록으로 돌아가기"
+              className="flex md:hidden items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              목록으로
+            </button>
+            <SettlementDetail
+              settlement={selectedSettlement}
+              onConfirm={handleConfirm}
+              onMarkPaid={handleMarkPaid}
+            />
+          </div>
         ) : (
           <div className="flex flex-1 items-center justify-center text-muted-foreground">
             <p className="text-sm">정산을 선택하세요</p>

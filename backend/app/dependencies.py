@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import Depends
+from fastapi import Depends, Query
 from fastapi.security import OAuth2PasswordBearer
 from jwt.exceptions import InvalidTokenError
 from sqlalchemy import select
@@ -8,8 +8,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.exceptions import UnauthorizedError
+from app.core.logging import clinic_id_var, user_id_var
 from app.core.security import decode_token
 from app.models.user import User
+from app.schemas.pagination import PaginationParams
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
@@ -34,4 +36,14 @@ async def get_current_user(
     if user is None or not user.is_active:
         raise UnauthorizedError()
 
+    clinic_id_var.set(str(user.clinic_id))
+    user_id_var.set(str(user.id))
+
     return user
+
+
+def get_pagination(
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+) -> PaginationParams:
+    return PaginationParams(limit=limit, offset=offset)

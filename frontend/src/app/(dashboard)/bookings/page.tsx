@@ -13,11 +13,9 @@ import {
 
 import { useAuthStore } from "@/stores/auth";
 import { useBookingStore } from "@/stores/booking";
-import {
-  Card,
-  CardContent,
-} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { ListSkeleton } from "@/components/shared/skeletons";
+import { PaginationControls } from "@/components/shared/pagination-controls";
 import type { BookingStatus } from "@/types/booking";
 import {
   BOOKING_STATUS_LABELS,
@@ -43,15 +41,17 @@ const STATUS_ICONS: Record<string, React.ElementType> = {
 
 export default function BookingsPage() {
   const { accessToken } = useAuthStore();
-  const { bookings, isLoading, error, fetchBookings, cancelBooking, completeBooking } =
-    useBookingStore();
+  const {
+    bookings, isLoading, error, total, page, pageSize,
+    fetchBookings, setPage, cancelBooking, completeBooking,
+  } = useBookingStore();
   const [statusFilter, setStatusFilter] = useState("all");
 
   useEffect(() => {
     if (accessToken) {
       fetchBookings(accessToken, statusFilter === "all" ? undefined : statusFilter);
     }
-  }, [accessToken, fetchBookings, statusFilter]);
+  }, [accessToken, fetchBookings, statusFilter, page]);
 
   const handleCancel = async (id: string) => {
     if (!accessToken) return;
@@ -63,15 +63,6 @@ export default function BookingsPage() {
     await completeBooking(accessToken, id);
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex flex-1 items-center justify-center text-muted-foreground">
-        <Calendar className="mr-2 h-5 w-5 animate-pulse" />
-        예약 로딩 중...
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       {/* Header */}
@@ -82,16 +73,17 @@ export default function BookingsPage() {
             <h1 className="text-lg font-bold">예약 관리</h1>
           </div>
           <span className="text-sm text-muted-foreground">
-            총 {bookings.length}건
+            총 {total}건
           </span>
         </div>
         {/* Status Filters */}
-        <div className="mt-3 flex gap-2">
+        <div className="mt-3 flex gap-2 overflow-x-auto">
           {STATUS_FILTERS.map((f) => (
             <button
               key={f.id}
-              onClick={() => setStatusFilter(f.id)}
-              className={`rounded-full px-3 py-1 text-xs transition-colors ${
+              onClick={() => { setStatusFilter(f.id); setPage(1); }}
+              aria-pressed={statusFilter === f.id}
+              className={`whitespace-nowrap rounded-full px-3 py-1 text-xs transition-colors ${
                 statusFilter === f.id
                   ? "bg-primary text-primary-foreground"
                   : "bg-muted hover:bg-muted/80"
@@ -112,7 +104,9 @@ export default function BookingsPage() {
 
       {/* Table */}
       <div className="flex-1 overflow-y-auto">
-        {bookings.length === 0 ? (
+        {isLoading ? (
+          <ListSkeleton />
+        ) : bookings.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-12 text-muted-foreground">
             <Calendar className="mb-2 h-8 w-8" />
             <p className="text-sm">예약이 없습니다</p>
@@ -125,10 +119,10 @@ export default function BookingsPage() {
               return (
                 <div
                   key={booking.id}
-                  className="flex items-center justify-between px-6 py-4 hover:bg-muted/50"
+                  className="flex flex-col gap-2 px-6 py-4 hover:bg-muted/50 md:flex-row md:items-center md:justify-between"
                 >
                   <div className="flex items-center gap-4">
-                    <StatusIcon className="h-5 w-5 text-muted-foreground" />
+                    <StatusIcon className="h-5 w-5 shrink-0 text-muted-foreground" />
                     <div>
                       <p className="text-sm font-medium">
                         {booking.booking_date} {booking.booking_time}
@@ -161,6 +155,7 @@ export default function BookingsPage() {
                         size="sm"
                         className="h-7 text-xs"
                         onClick={() => handleComplete(booking.id)}
+                        aria-label="예약 완료"
                       >
                         <CheckCircle className="mr-1 h-3 w-3" />
                         완료
@@ -173,6 +168,7 @@ export default function BookingsPage() {
                         size="sm"
                         className="h-7 text-xs text-destructive hover:text-destructive"
                         onClick={() => handleCancel(booking.id)}
+                        aria-label="예약 취소"
                       >
                         <Ban className="mr-1 h-3 w-3" />
                         취소
@@ -185,6 +181,13 @@ export default function BookingsPage() {
           </div>
         )}
       </div>
+
+      <PaginationControls
+        page={page}
+        pageSize={pageSize}
+        total={total}
+        onPageChange={setPage}
+      />
     </div>
   );
 }

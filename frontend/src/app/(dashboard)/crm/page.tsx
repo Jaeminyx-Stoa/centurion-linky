@@ -15,10 +15,10 @@ import { useCRMStore } from "@/stores/crm";
 import {
   Card,
   CardContent,
-  CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { ListSkeleton } from "@/components/shared/skeletons";
+import { PaginationControls } from "@/components/shared/pagination-controls";
 
 type TabId = "events" | "surveys";
 
@@ -37,7 +37,10 @@ const EVENT_STATUS_COLORS: Record<string, string> = {
 
 function EventsTab() {
   const { accessToken } = useAuthStore();
-  const { events, cancelEvent } = useCRMStore();
+  const {
+    events, eventsPage, eventsPageSize, eventsTotal,
+    cancelEvent, setEventsPage,
+  } = useCRMStore();
   const [statusFilter, setStatusFilter] = useState("all");
 
   const STATUS_FILTERS = [
@@ -58,7 +61,7 @@ function EventsTab() {
           statusFilter === "all" ? undefined : statusFilter,
         );
     }
-  }, [accessToken, statusFilter]);
+  }, [accessToken, statusFilter, eventsPage]);
 
   const handleCancel = async (id: string) => {
     if (!accessToken) return;
@@ -67,12 +70,13 @@ function EventsTab() {
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-2">
+      <div className="flex gap-2 overflow-x-auto">
         {STATUS_FILTERS.map((f) => (
           <button
             key={f.id}
-            onClick={() => setStatusFilter(f.id)}
-            className={`rounded-full px-3 py-1 text-xs transition-colors ${
+            onClick={() => { setStatusFilter(f.id); setEventsPage(1); }}
+            aria-pressed={statusFilter === f.id}
+            className={`whitespace-nowrap rounded-full px-3 py-1 text-xs transition-colors ${
               statusFilter === f.id
                 ? "bg-primary text-primary-foreground"
                 : "bg-muted hover:bg-muted/80"
@@ -126,6 +130,7 @@ function EventsTab() {
                         size="sm"
                         className="h-7 text-xs text-destructive hover:text-destructive"
                         onClick={() => handleCancel(event.id)}
+                        aria-label="이벤트 취소"
                       >
                         <XCircle className="mr-1 h-3 w-3" />
                         취소
@@ -135,6 +140,12 @@ function EventsTab() {
                 </div>
               ))}
             </div>
+            <PaginationControls
+              page={eventsPage}
+              pageSize={eventsPageSize}
+              total={eventsTotal}
+              onPageChange={setEventsPage}
+            />
           </CardContent>
         </Card>
       )}
@@ -143,7 +154,7 @@ function EventsTab() {
 }
 
 function SurveysTab() {
-  const { surveys, surveySummary } = useCRMStore();
+  const { surveys, surveySummary, surveysPage, surveysPageSize, surveysTotal, setSurveysPage } = useCRMStore();
   const { accessToken } = useAuthStore();
   const [roundFilter, setRoundFilter] = useState<number | null>(null);
 
@@ -153,13 +164,13 @@ function SurveysTab() {
         .getState()
         .fetchSurveys(accessToken, roundFilter || undefined);
     }
-  }, [accessToken, roundFilter]);
+  }, [accessToken, roundFilter, surveysPage]);
 
   return (
     <div className="space-y-4">
       {/* Summary */}
       {surveySummary && (
-        <div className="grid grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
           <Card>
             <CardContent className="pt-0">
               <p className="text-sm text-muted-foreground">총 설문</p>
@@ -204,12 +215,13 @@ function SurveysTab() {
       )}
 
       {/* Round Filter */}
-      <div className="flex gap-2">
+      <div className="flex gap-2 overflow-x-auto">
         {[null, 1, 2, 3].map((r) => (
           <button
             key={r ?? "all"}
-            onClick={() => setRoundFilter(r)}
-            className={`rounded-full px-3 py-1 text-xs transition-colors ${
+            onClick={() => { setRoundFilter(r); setSurveysPage(1); }}
+            aria-pressed={roundFilter === r}
+            className={`whitespace-nowrap rounded-full px-3 py-1 text-xs transition-colors ${
               roundFilter === r
                 ? "bg-primary text-primary-foreground"
                 : "bg-muted hover:bg-muted/80"
@@ -266,6 +278,12 @@ function SurveysTab() {
                 </div>
               ))}
             </div>
+            <PaginationControls
+              page={surveysPage}
+              pageSize={surveysPageSize}
+              total={surveysTotal}
+              onPageChange={setSurveysPage}
+            />
           </CardContent>
         </Card>
       )}
@@ -286,25 +304,33 @@ export default function CRMPage() {
 
   if (isLoading) {
     return (
-      <div className="flex flex-1 items-center justify-center text-muted-foreground">
-        <Heart className="mr-2 h-5 w-5 animate-pulse" />
-        CRM 로딩 중...
+      <div className="flex flex-1 flex-col md:flex-row overflow-hidden">
+        <div className="hidden md:flex w-[180px] flex-col border-r">
+          <div className="border-b px-4 py-3">
+            <h2 className="text-sm font-semibold">CRM</h2>
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto p-6">
+          <ListSkeleton />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-1 overflow-hidden">
+    <div className="flex flex-1 flex-col md:flex-row overflow-hidden">
       {/* Tab sidebar */}
-      <div className="flex w-[180px] flex-col border-r">
+      <div className="hidden flex-col border-r md:flex md:w-[180px]">
         <div className="border-b px-4 py-3">
           <h2 className="text-sm font-semibold">CRM</h2>
         </div>
-        <nav className="flex-1 p-2">
+        <nav className="flex-1 p-2" aria-label="CRM 탭">
           {TABS.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
               onClick={() => setActiveTab(id)}
+              role="tab"
+              aria-selected={activeTab === id}
               className={`flex w-full items-center gap-2 rounded px-3 py-2 text-sm transition-colors ${
                 activeTab === id
                   ? "bg-primary text-primary-foreground"
@@ -316,6 +342,26 @@ export default function CRMPage() {
             </button>
           ))}
         </nav>
+      </div>
+
+      {/* Mobile tabs */}
+      <div className="flex overflow-x-auto border-b md:hidden" role="tablist" aria-label="CRM 탭">
+        {TABS.map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            onClick={() => setActiveTab(id)}
+            role="tab"
+            aria-selected={activeTab === id}
+            className={`flex items-center gap-1 whitespace-nowrap px-4 py-2 text-sm ${
+              activeTab === id
+                ? "border-b-2 border-primary text-primary"
+                : "text-muted-foreground"
+            }`}
+          >
+            <Icon className="h-4 w-4" />
+            {label}
+          </button>
+        ))}
       </div>
 
       {/* Content */}

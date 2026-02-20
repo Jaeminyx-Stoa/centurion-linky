@@ -133,7 +133,9 @@ class TestListSettlements:
             "/api/v1/settlements", headers=stl_headers
         )
         assert resp.status_code == 200
-        assert resp.json() == []
+        data = resp.json()
+        assert data["items"] == []
+        assert data["total"] == 0
 
     @pytest.mark.asyncio
     async def test_list_with_filter(
@@ -149,7 +151,7 @@ class TestListSettlements:
             "/api/v1/settlements?year=2026&month=1", headers=stl_headers
         )
         assert resp.status_code == 200
-        assert len(resp.json()) == 1
+        assert resp.json()["total"] == 1
 
     @pytest.mark.asyncio
     async def test_list_year_filter_no_match(
@@ -164,7 +166,9 @@ class TestListSettlements:
             "/api/v1/settlements?year=2025", headers=stl_headers
         )
         assert resp.status_code == 200
-        assert resp.json() == []
+        data = resp.json()
+        assert data["items"] == []
+        assert data["total"] == 0
 
 
 class TestGetSettlement:

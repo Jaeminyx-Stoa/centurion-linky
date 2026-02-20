@@ -10,7 +10,7 @@ class ResponseLibrary(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "response_library"
 
     clinic_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("clinics.id"), nullable=False
+        ForeignKey("clinics.id"), nullable=False, index=True
     )
 
     category: Mapped[str] = mapped_column(String(50), nullable=False)
