@@ -6,7 +6,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: medical_messenger
     ports:
-      - "5432:5432"
+      - "11300:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -18,7 +18,7 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "6380:6379"
+      - "11400:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -28,8 +28,8 @@ services:
   rabbitmq:
     image: rabbitmq:3-management-alpine
     ports:
-      - "5673:5672"
-      - "15673:15672"
+      - "11500:5672"
+      - "11501:15672"
     environment:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
@@ -38,6 +38,41 @@ services:
       interval: 10s
       timeout: 10s
       retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "11200:8000"
+    env_file:
+      - .env.docker
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "11100:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://211.202.25.246:11200
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    restart: unless-stopped
 
 volumes:
   pgdata:

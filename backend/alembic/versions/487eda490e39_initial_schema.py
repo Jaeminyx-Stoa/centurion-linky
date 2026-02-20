@@ -1,8 +1,8 @@
-"""add crm_events and satisfaction_surveys tables
+"""initial schema
 
-Revision ID: ebdc179ab4ff
-Revises: 3af698e4c682
-Create Date: 2026-02-18 22:42:23.473516
+Revision ID: 487eda490e39
+Revises: 
+Create Date: 2026-02-19 02:41:31.267097
 
 """
 from typing import Sequence, Union
@@ -12,8 +12,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = 'ebdc179ab4ff'
-down_revision: Union[str, Sequence[str], None] = '3af698e4c682'
+revision: str = '487eda490e39'
+down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -68,6 +68,22 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('slug')
     )
+    op.create_table('ab_tests',
+    sa.Column('clinic_id', sa.Uuid(), nullable=False),
+    sa.Column('name', sa.String(length=200), nullable=False),
+    sa.Column('description', sa.Text(), nullable=True),
+    sa.Column('test_type', sa.String(length=50), nullable=False),
+    sa.Column('status', sa.String(length=20), nullable=False),
+    sa.Column('started_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('ended_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('is_active', sa.Boolean(), nullable=False),
+    sa.Column('id', sa.Uuid(), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.ForeignKeyConstraint(['clinic_id'], ['clinics.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_ab_tests_clinic_id'), 'ab_tests', ['clinic_id'], unique=False)
     op.create_table('ai_personas',
     sa.Column('clinic_id', sa.Uuid(), nullable=False),
     sa.Column('name', sa.String(length=100), nullable=False),
@@ -82,6 +98,27 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['clinic_id'], ['clinics.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
+    op.create_table('consultation_performances',
+    sa.Column('clinic_id', sa.Uuid(), nullable=False),
+    sa.Column('period_year', sa.Integer(), nullable=False),
+    sa.Column('period_month', sa.Integer(), nullable=False),
+    sa.Column('total_score', sa.Numeric(precision=5, scale=2), nullable=False),
+    sa.Column('sales_mix_score', sa.Numeric(precision=5, scale=2), nullable=False),
+    sa.Column('booking_conversion_score', sa.Numeric(precision=5, scale=2), nullable=False),
+    sa.Column('payment_conversion_score', sa.Numeric(precision=5, scale=2), nullable=False),
+    sa.Column('booking_conversion_rate', sa.Numeric(precision=5, scale=2), nullable=False),
+    sa.Column('payment_conversion_rate', sa.Numeric(precision=5, scale=2), nullable=False),
+    sa.Column('total_consultations', sa.Integer(), nullable=False),
+    sa.Column('total_bookings', sa.Integer(), nullable=False),
+    sa.Column('total_payments', sa.Integer(), nullable=False),
+    sa.Column('id', sa.Uuid(), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.ForeignKeyConstraint(['clinic_id'], ['clinics.id'], ),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('clinic_id', 'period_year', 'period_month')
+    )
+    op.create_index(op.f('ix_consultation_performances_clinic_id'), 'consultation_performances', ['clinic_id'], unique=False)
     op.create_table('customers',
     sa.Column('clinic_id', sa.Uuid(), nullable=False),
     sa.Column('messenger_type', sa.String(length=20), nullable=False),
@@ -186,6 +223,45 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['clinic_id'], ['clinics.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
+    op.create_table('settlements',
+    sa.Column('clinic_id', sa.Uuid(), nullable=False),
+    sa.Column('period_year', sa.Integer(), nullable=False),
+    sa.Column('period_month', sa.Integer(), nullable=False),
+    sa.Column('total_payment_amount', sa.Numeric(precision=15, scale=2), nullable=False),
+    sa.Column('commission_rate', sa.Numeric(precision=5, scale=2), nullable=False),
+    sa.Column('commission_amount', sa.Numeric(precision=15, scale=2), nullable=False),
+    sa.Column('vat_amount', sa.Numeric(precision=15, scale=2), nullable=False),
+    sa.Column('total_settlement', sa.Numeric(precision=15, scale=2), nullable=False),
+    sa.Column('total_payment_count', sa.Integer(), nullable=False),
+    sa.Column('status', sa.String(length=20), nullable=False),
+    sa.Column('notes', sa.Text(), nullable=True),
+    sa.Column('confirmed_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('paid_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('id', sa.Uuid(), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.ForeignKeyConstraint(['clinic_id'], ['clinics.id'], ),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('clinic_id', 'period_year', 'period_month')
+    )
+    op.create_index(op.f('ix_settlements_clinic_id'), 'settlements', ['clinic_id'], unique=False)
+    op.create_table('simulation_sessions',
+    sa.Column('clinic_id', sa.Uuid(), nullable=False),
+    sa.Column('persona_name', sa.String(length=100), nullable=False),
+    sa.Column('persona_config', postgresql.JSONB(astext_type=sa.Text()), nullable=False),
+    sa.Column('max_rounds', sa.Integer(), nullable=False),
+    sa.Column('actual_rounds', sa.Integer(), nullable=False),
+    sa.Column('status', sa.String(length=20), nullable=False),
+    sa.Column('messages', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+    sa.Column('started_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('completed_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('id', sa.Uuid(), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.ForeignKeyConstraint(['clinic_id'], ['clinics.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_simulation_sessions_clinic_id'), 'simulation_sessions', ['clinic_id'], unique=False)
     op.create_table('users',
     sa.Column('clinic_id', sa.Uuid(), nullable=True),
     sa.Column('email', sa.String(length=200), nullable=False),
@@ -201,6 +277,17 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['clinic_id'], ['clinics.id'], ),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('email')
+    )
+    op.create_table('ab_test_variants',
+    sa.Column('ab_test_id', sa.Uuid(), nullable=False),
+    sa.Column('name', sa.String(length=100), nullable=False),
+    sa.Column('config', postgresql.JSONB(astext_type=sa.Text()), nullable=False),
+    sa.Column('weight', sa.Integer(), nullable=False),
+    sa.Column('id', sa.Uuid(), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.ForeignKeyConstraint(['ab_test_id'], ['ab_tests.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id')
     )
     op.create_table('clinic_procedures',
     sa.Column('clinic_id', sa.Uuid(), nullable=False),
@@ -259,6 +346,42 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['messenger_account_id'], ['messenger_accounts.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
+    op.create_table('simulation_results',
+    sa.Column('session_id', sa.Uuid(), nullable=False),
+    sa.Column('clinic_id', sa.Uuid(), nullable=False),
+    sa.Column('booked', sa.Boolean(), nullable=False),
+    sa.Column('paid', sa.Boolean(), nullable=False),
+    sa.Column('escalated', sa.Boolean(), nullable=False),
+    sa.Column('abandoned', sa.Boolean(), nullable=False),
+    sa.Column('satisfaction_score', sa.Integer(), nullable=True),
+    sa.Column('response_quality_score', sa.Integer(), nullable=True),
+    sa.Column('exit_reason', sa.String(length=100), nullable=True),
+    sa.Column('strategies_used', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+    sa.Column('notes', sa.Text(), nullable=True),
+    sa.Column('id', sa.Uuid(), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.ForeignKeyConstraint(['clinic_id'], ['clinics.id'], ),
+    sa.ForeignKeyConstraint(['session_id'], ['simulation_sessions.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('session_id')
+    )
+    op.create_index(op.f('ix_simulation_results_clinic_id'), 'simulation_results', ['clinic_id'], unique=False)
+    op.create_table('ab_test_results',
+    sa.Column('ab_test_id', sa.Uuid(), nullable=False),
+    sa.Column('variant_id', sa.Uuid(), nullable=False),
+    sa.Column('conversation_id', sa.Uuid(), nullable=False),
+    sa.Column('outcome', sa.String(length=50), nullable=False),
+    sa.Column('outcome_data', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+    sa.Column('id', sa.Uuid(), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.ForeignKeyConstraint(['ab_test_id'], ['ab_tests.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['conversation_id'], ['conversations.id'], ),
+    sa.ForeignKeyConstraint(['variant_id'], ['ab_test_variants.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_ab_test_results_ab_test_id'), 'ab_test_results', ['ab_test_id'], unique=False)
     op.create_table('bookings',
     sa.Column('clinic_id', sa.Uuid(), nullable=False),
     sa.Column('customer_id', sa.Uuid(), nullable=False),
@@ -327,6 +450,29 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_procedure_pricing_clinic_id'), 'procedure_pricing', ['clinic_id'], unique=False)
+    op.create_table('satisfaction_scores',
+    sa.Column('conversation_id', sa.Uuid(), nullable=False),
+    sa.Column('clinic_id', sa.Uuid(), nullable=False),
+    sa.Column('score', sa.Integer(), nullable=False),
+    sa.Column('level', sa.String(length=10), nullable=False),
+    sa.Column('language_signals', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+    sa.Column('behavior_signals', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+    sa.Column('flow_signals', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+    sa.Column('supervisor_override', sa.Integer(), nullable=True),
+    sa.Column('supervisor_note', sa.Text(), nullable=True),
+    sa.Column('supervised_by', sa.Uuid(), nullable=True),
+    sa.Column('supervised_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('alert_sent', sa.Boolean(), nullable=False),
+    sa.Column('alert_sent_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default='now()', nullable=False),
+    sa.Column('id', sa.Uuid(), nullable=False),
+    sa.ForeignKeyConstraint(['clinic_id'], ['clinics.id'], ),
+    sa.ForeignKeyConstraint(['conversation_id'], ['conversations.id'], ),
+    sa.ForeignKeyConstraint(['supervised_by'], ['users.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_satisfaction_scores_clinic_id'), 'satisfaction_scores', ['clinic_id'], unique=False)
+    op.create_index(op.f('ix_satisfaction_scores_conversation_id'), 'satisfaction_scores', ['conversation_id'], unique=False)
     op.create_table('payments',
     sa.Column('clinic_id', sa.Uuid(), nullable=False),
     sa.Column('booking_id', sa.Uuid(), nullable=True),
@@ -410,21 +556,37 @@ def downgrade() -> None:
     op.drop_table('crm_events')
     op.drop_index(op.f('ix_payments_clinic_id'), table_name='payments')
     op.drop_table('payments')
+    op.drop_index(op.f('ix_satisfaction_scores_conversation_id'), table_name='satisfaction_scores')
+    op.drop_index(op.f('ix_satisfaction_scores_clinic_id'), table_name='satisfaction_scores')
+    op.drop_table('satisfaction_scores')
     op.drop_index(op.f('ix_procedure_pricing_clinic_id'), table_name='procedure_pricing')
     op.drop_table('procedure_pricing')
     op.drop_table('messages')
     op.drop_index(op.f('ix_bookings_clinic_id'), table_name='bookings')
     op.drop_table('bookings')
+    op.drop_index(op.f('ix_ab_test_results_ab_test_id'), table_name='ab_test_results')
+    op.drop_table('ab_test_results')
+    op.drop_index(op.f('ix_simulation_results_clinic_id'), table_name='simulation_results')
+    op.drop_table('simulation_results')
     op.drop_table('conversations')
     op.drop_index(op.f('ix_clinic_procedures_clinic_id'), table_name='clinic_procedures')
     op.drop_table('clinic_procedures')
+    op.drop_table('ab_test_variants')
     op.drop_table('users')
+    op.drop_index(op.f('ix_simulation_sessions_clinic_id'), table_name='simulation_sessions')
+    op.drop_table('simulation_sessions')
+    op.drop_index(op.f('ix_settlements_clinic_id'), table_name='settlements')
+    op.drop_table('settlements')
     op.drop_table('response_library')
     op.drop_table('procedures')
     op.drop_table('messenger_accounts')
     op.drop_table('medical_terms')
     op.drop_table('customers')
+    op.drop_index(op.f('ix_consultation_performances_clinic_id'), table_name='consultation_performances')
+    op.drop_table('consultation_performances')
     op.drop_table('ai_personas')
+    op.drop_index(op.f('ix_ab_tests_clinic_id'), table_name='ab_tests')
+    op.drop_table('ab_tests')
     op.drop_table('procedure_categories')
     op.drop_table('cultural_profiles')
     op.drop_table('clinics')

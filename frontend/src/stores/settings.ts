@@ -1,7 +1,12 @@
 import { create } from "zustand";
 
 import { api } from "@/lib/api";
-import type { AIPersona, MessengerAccount } from "@/types/analytics";
+import type {
+  AIPersona,
+  MessengerAccount,
+  MessengerAccountCreate,
+  MessengerAccountUpdate,
+} from "@/types/analytics";
 
 interface Clinic {
   id: string;
@@ -27,6 +32,16 @@ interface SettingsState {
     data: Record<string, unknown>,
   ) => Promise<void>;
   fetchMessengerAccounts: (token: string) => Promise<void>;
+  createMessengerAccount: (
+    token: string,
+    data: MessengerAccountCreate,
+  ) => Promise<void>;
+  updateMessengerAccount: (
+    token: string,
+    id: string,
+    data: MessengerAccountUpdate,
+  ) => Promise<void>;
+  deleteMessengerAccount: (token: string, id: string) => Promise<void>;
   fetchAIPersonas: (token: string) => Promise<void>;
   createAIPersona: (
     token: string,
@@ -66,6 +81,27 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       { token },
     );
     set({ messengerAccounts: data });
+  },
+
+  createMessengerAccount: async (token, data) => {
+    await api.post<MessengerAccount>("/api/v1/messenger-accounts", data, {
+      token,
+    });
+    await get().fetchMessengerAccounts(token);
+  },
+
+  updateMessengerAccount: async (token, id, data) => {
+    await api.patch<MessengerAccount>(
+      `/api/v1/messenger-accounts/${id}`,
+      data,
+      { token },
+    );
+    await get().fetchMessengerAccounts(token);
+  },
+
+  deleteMessengerAccount: async (token, id) => {
+    await api.delete(`/api/v1/messenger-accounts/${id}`, { token });
+    await get().fetchMessengerAccounts(token);
   },
 
   fetchAIPersonas: async (token) => {

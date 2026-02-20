@@ -34,6 +34,10 @@ async function request<T>(
     throw new ApiError(res.status, body.detail || res.statusText);
   }
 
+  if (res.status === 204) {
+    return undefined as T;
+  }
+
   return res.json();
 }
 
