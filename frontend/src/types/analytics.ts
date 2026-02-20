@@ -48,11 +48,67 @@ export interface AIPersona {
 export interface MessengerAccount {
   id: string;
   clinic_id: string;
-  platform: string;
-  account_name: string | null;
-  account_id: string | null;
+  messenger_type: string;
+  account_name: string;
+  display_name: string | null;
+  webhook_url: string | null;
+  target_countries: string[] | null;
   is_active: boolean;
-  config: Record<string, unknown> | null;
+  is_connected: boolean;
+  last_synced_at: string | null;
   created_at: string;
-  updated_at: string | null;
 }
+
+export interface MessengerAccountCreate {
+  messenger_type: string;
+  account_name: string;
+  display_name?: string;
+  credentials: Record<string, string>;
+  target_countries?: string[];
+}
+
+export interface MessengerAccountUpdate {
+  account_name?: string;
+  display_name?: string;
+  credentials?: Record<string, string>;
+  target_countries?: string[];
+  is_active?: boolean;
+}
+
+export interface AnalyticsOverview {
+  total_conversations: number;
+  total_customers: number;
+  total_bookings: number;
+  total_revenue: number;
+  ai_response_rate: number;
+  avg_response_time: number;
+}
+
+export interface ConsultationPerformance {
+  year: number;
+  month: number;
+  total_score: number;
+  sales_mix_score: number;
+  booking_conversion_score: number;
+  payment_conversion_score: number;
+  total_conversations: number;
+  total_bookings: number;
+  total_payments: number;
+}
+
+export interface SatisfactionScore {
+  id: string;
+  conversation_id: string;
+  clinic_id: string;
+  score: number;
+  level: string;
+  analysis: Record<string, unknown> | null;
+  supervisor_override: number | null;
+  created_at: string;
+}
+
+export interface CRMEventSummary {
+  event_type: string;
+  count: number;
+}
+

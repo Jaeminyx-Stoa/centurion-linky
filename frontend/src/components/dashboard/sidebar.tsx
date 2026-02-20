@@ -2,23 +2,33 @@
 
 import { useRouter, usePathname } from "next/navigation";
 import {
+  LayoutDashboard,
   MessageSquare,
-  BarChart3,
+  Users,
+  Calendar,
+  CreditCard,
   Syringe,
-  Receipt,
+  Heart,
+  BarChart3,
+  BookOpen,
+  FlaskConical,
   Settings,
   LogOut,
-  BookOpen,
 } from "lucide-react";
 
 import { useAuthStore } from "@/stores/auth";
 
 const NAV_ITEMS = [
-  { icon: MessageSquare, label: "받은 메시지", href: "/" },
-  { icon: Syringe, label: "시술 관리", href: "/procedures" },
+  { icon: LayoutDashboard, label: "대시보드", href: "/" },
+  { icon: MessageSquare, label: "받은 메시지", href: "/conversations" },
+  { icon: Users, label: "고객", href: "/customers" },
+  { icon: Calendar, label: "예약", href: "/bookings" },
+  { icon: CreditCard, label: "결제", href: "/payments" },
+  { icon: Syringe, label: "시술", href: "/procedures" },
+  { icon: Heart, label: "CRM", href: "/crm" },
   { icon: BarChart3, label: "통계", href: "/analytics" },
   { icon: BookOpen, label: "지식 관리", href: "/knowledge" },
-  { icon: Receipt, label: "정산", href: "/settlements" },
+  { icon: FlaskConical, label: "AI Lab", href: "/ai-lab" },
   { icon: Settings, label: "설정", href: "/settings" },
 ];
 
