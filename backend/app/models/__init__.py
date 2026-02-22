@@ -11,6 +11,7 @@ from app.models.conversation import Conversation
 from app.models.crm_event import CRMEvent
 from app.models.cultural_profile import CulturalProfile
 from app.models.customer import Customer
+from app.models.followup_rule import FollowupRule
 from app.models.llm_usage import LLMUsage
 from app.models.medical_term import MedicalTerm
 from app.models.package_enrollment import PackageEnrollment
@@ -22,7 +23,9 @@ from app.models.procedure import Procedure
 from app.models.procedure_package import ProcedurePackage
 from app.models.procedure_category import ProcedureCategory
 from app.models.procedure_pricing import ProcedurePricing
+from app.models.medical_document import MedicalDocument
 from app.models.response_library import ResponseLibrary
+from app.models.side_effect_keyword import SideEffectKeyword
 from app.models.satisfaction_score import SatisfactionScore
 from app.models.simulation import SimulationResult, SimulationSession
 from app.models.satisfaction_survey import SatisfactionSurvey
@@ -45,7 +48,9 @@ __all__ = [
     "CRMEvent",
     "CulturalProfile",
     "Customer",
+    "FollowupRule",
     "LLMUsage",
+    "MedicalDocument",
     "MedicalTerm",
     "PackageEnrollment",
     "PackageSession",
@@ -62,5 +67,6 @@ __all__ = [
     "SimulationResult",
     "SimulationSession",
     "Settlement",
+    "SideEffectKeyword",
     "User",
 ]

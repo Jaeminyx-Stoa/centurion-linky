@@ -135,6 +135,29 @@ class AIResponseService:
             conversation.clinic_id, conversation_id, persona
         )
 
+        # 7.6 Side-effect keyword detection (staff alert only)
+        try:
+            from app.services.followup_service import FollowupService
+
+            followup_svc = FollowupService(self.db)
+            side_effect = await followup_svc.check_side_effects(
+                query, conversation.clinic_id, language_code
+            )
+            if side_effect:
+                await manager.broadcast_to_clinic(
+                    conversation.clinic_id,
+                    {
+                        "type": "side_effect_alert",
+                        "conversation_id": str(conversation_id),
+                        "customer_id": str(customer.id),
+                        "matched_keywords": side_effect["matched_keywords"],
+                        "severity": side_effect["severity"],
+                        "message_preview": query[:200],
+                    },
+                )
+        except Exception:
+            logger.exception("Side-effect detection failed")
+
         # 8. Run consultation
         try:
             result = await self.consultation_service.consult(

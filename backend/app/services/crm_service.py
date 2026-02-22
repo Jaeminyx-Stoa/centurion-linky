@@ -9,15 +9,11 @@ from app.models.booking import Booking
 from app.models.crm_event import CRMEvent
 from app.models.payment import Payment
 
-# Default CRM timeline offsets
+# Default CRM timeline offsets (aftercare/survey_2/survey_3/revisit moved to FollowupRules)
 _TIMELINE = [
     ("receipt", timedelta(minutes=0)),
     ("review_request", timedelta(minutes=30)),
-    ("aftercare", timedelta(hours=3)),
     ("survey_1", timedelta(hours=6)),
-    ("survey_2", timedelta(days=7)),
-    ("survey_3", timedelta(days=14)),
-    ("revisit_reminder", timedelta(days=90)),
 ]
 
 

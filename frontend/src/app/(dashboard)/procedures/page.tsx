@@ -13,12 +13,14 @@ import {
   Save,
   Package,
   ClipboardCheck,
+  HeartPulse,
 } from "lucide-react";
 
 import { useAuthStore } from "@/stores/auth";
 import { useProcedureStore } from "@/stores/procedure";
 import { usePackageStore } from "@/stores/package";
 import { useProtocolStore } from "@/stores/protocol";
+import { useFollowupStore } from "@/stores/followup";
 import { useT } from "@/i18n";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,7 +33,7 @@ import {
 } from "@/components/ui/card";
 import type { ProcedureCategoryTree, ClinicProcedure } from "@/types/procedure";
 
-type TabId = "clinic" | "categories" | "pricing" | "packages" | "protocols";
+type TabId = "clinic" | "categories" | "pricing" | "packages" | "protocols" | "followups";
 
 const TABS: { id: TabId; label: string; icon: React.ElementType }[] = [
   { id: "clinic", label: "시술 목록", icon: Syringe },
@@ -39,6 +41,7 @@ const TABS: { id: TabId; label: string; icon: React.ElementType }[] = [
   { id: "pricing", label: "가격 관리", icon: DollarSign },
   { id: "packages", label: "패키지", icon: Package },
   { id: "protocols", label: "상담 프로토콜", icon: ClipboardCheck },
+  { id: "followups", label: "시술 후 관리", icon: HeartPulse },
 ];
 
 function CategoryItem({
@@ -928,6 +931,293 @@ function PackagesTab() {
   );
 }
 
+function FollowupsTab() {
+  const { accessToken } = useAuthStore();
+  const t = useT();
+  const { rules, keywords, fetchRules, fetchKeywords, createRule, deleteRule, createKeywords } =
+    useFollowupStore();
+  const [showCreate, setShowCreate] = useState(false);
+  const [eventType, setEventType] = useState("recovery_check");
+  const [delayDays, setDelayDays] = useState("1");
+  const [delayHours, setDelayHours] = useState("0");
+  const [templateKo, setTemplateKo] = useState("");
+  const [templateEn, setTemplateEn] = useState("");
+
+  const [showKw, setShowKw] = useState(false);
+  const [kwLang, setKwLang] = useState("ko");
+  const [kwText, setKwText] = useState("");
+  const [kwSeverity, setKwSeverity] = useState("normal");
+
+  useEffect(() => {
+    if (accessToken) {
+      fetchRules(accessToken);
+      fetchKeywords(accessToken);
+    }
+  }, [accessToken, fetchRules, fetchKeywords]);
+
+  const EVENT_TYPES = [
+    { value: "recovery_check", label: t("followups.type.recoveryCheck") },
+    { value: "side_effect_check", label: t("followups.type.sideEffectCheck") },
+    { value: "result_check", label: t("followups.type.resultCheck") },
+    { value: "retouch_reminder", label: t("followups.type.retouchReminder") },
+  ];
+
+  const handleCreateRule = async () => {
+    if (!accessToken) return;
+    const template: Record<string, string> = {};
+    if (templateKo.trim()) template.ko = templateKo.trim();
+    if (templateEn.trim()) template.en = templateEn.trim();
+    await createRule(accessToken, {
+      event_type: eventType,
+      delay_days: Number(delayDays) || 0,
+      delay_hours: Number(delayHours) || 0,
+      message_template: Object.keys(template).length > 0 ? template : null,
+    });
+    setShowCreate(false);
+    setTemplateKo("");
+    setTemplateEn("");
+  };
+
+  const handleCreateKw = async () => {
+    if (!accessToken || !kwText.trim()) return;
+    const kws = kwText.split(",").map((k) => k.trim()).filter(Boolean);
+    await createKeywords(accessToken, {
+      language: kwLang,
+      keywords: kws,
+      severity: kwSeverity,
+    });
+    setShowKw(false);
+    setKwText("");
+  };
+
+  return (
+    <div className="space-y-4 p-6">
+      {/* Rules Section */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-base font-semibold">{t("followups.rules")}</h2>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 text-xs"
+          onClick={() => setShowCreate(!showCreate)}
+        >
+          <Plus className="mr-1 h-3 w-3" />
+          {t("followups.create")}
+        </Button>
+      </div>
+
+      {showCreate && (
+        <Card>
+          <CardContent className="space-y-3 pt-4">
+            <div className="space-y-2">
+              <Label>{t("followups.eventType")}</Label>
+              <select
+                value={eventType}
+                onChange={(e) => setEventType(e.target.value)}
+                className="w-full rounded border px-3 py-2 text-sm"
+              >
+                {EVENT_TYPES.map((et) => (
+                  <option key={et.value} value={et.value}>
+                    {et.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>{t("followups.delayDays")}</Label>
+                <Input
+                  type="number"
+                  value={delayDays}
+                  onChange={(e) => setDelayDays(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>{t("followups.delayHours")}</Label>
+                <Input
+                  type="number"
+                  value={delayHours}
+                  onChange={(e) => setDelayHours(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>{t("followups.messageTemplate")} (KO)</Label>
+              <Input
+                value={templateKo}
+                onChange={(e) => setTemplateKo(e.target.value)}
+                placeholder="시술 후 상태는 어떠신가요?"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>{t("followups.messageTemplate")} (EN)</Label>
+              <Input
+                value={templateEn}
+                onChange={(e) => setTemplateEn(e.target.value)}
+                placeholder="How are you feeling after the procedure?"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" onClick={handleCreateRule}>
+                {t("common.save")}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowCreate(false)}
+              >
+                {t("common.cancel")}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card>
+        <CardContent className="p-0">
+          {rules.length === 0 ? (
+            <p className="p-4 text-sm text-muted-foreground">
+              {t("followups.empty")}
+            </p>
+          ) : (
+            <div className="divide-y">
+              {rules.map((rule) => (
+                <div
+                  key={rule.id}
+                  className="flex items-center justify-between px-4 py-3 hover:bg-muted/50"
+                >
+                  <div>
+                    <p className="text-sm font-medium">
+                      {EVENT_TYPES.find((e) => e.value === rule.event_type)?.label || rule.event_type}
+                    </p>
+                    <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
+                      <span>
+                        {rule.delay_days}{t("followups.delayDays")} {rule.delay_hours > 0 ? `${rule.delay_hours}${t("followups.delayHours")}` : ""}
+                      </span>
+                      <span>
+                        {rule.procedure_name || t("followups.global")}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {!rule.is_active && (
+                      <span className="rounded bg-red-100 px-1.5 py-0.5 text-[10px] text-red-700">
+                        비활성
+                      </span>
+                    )}
+                    <button
+                      onClick={() => accessToken && deleteRule(accessToken, rule.id)}
+                      className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Keywords Section */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-base font-semibold">{t("followups.keywords")}</h2>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 text-xs"
+          onClick={() => setShowKw(!showKw)}
+        >
+          <Plus className="mr-1 h-3 w-3" />
+          {t("followups.create")}
+        </Button>
+      </div>
+
+      {showKw && (
+        <Card>
+          <CardContent className="space-y-3 pt-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Language</Label>
+                <select
+                  value={kwLang}
+                  onChange={(e) => setKwLang(e.target.value)}
+                  className="w-full rounded border px-3 py-2 text-sm"
+                >
+                  <option value="ko">한국어</option>
+                  <option value="en">English</option>
+                  <option value="ja">日本語</option>
+                  <option value="zh">中文</option>
+                  <option value="vi">Tiếng Việt</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label>{t("followups.keywordsSeverity")}</Label>
+                <select
+                  value={kwSeverity}
+                  onChange={(e) => setKwSeverity(e.target.value)}
+                  className="w-full rounded border px-3 py-2 text-sm"
+                >
+                  <option value="normal">{t("followups.severity.normal")}</option>
+                  <option value="urgent">{t("followups.severity.urgent")}</option>
+                </select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>{t("followups.keywords")}</Label>
+              <Input
+                value={kwText}
+                onChange={(e) => setKwText(e.target.value)}
+                placeholder="아프다, 부어오르다, 빨갛다, 멍"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" onClick={handleCreateKw}>
+                {t("common.save")}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowKw(false)}
+              >
+                {t("common.cancel")}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card>
+        <CardContent className="p-0">
+          {keywords.length === 0 ? (
+            <p className="p-4 text-sm text-muted-foreground">
+              등록된 키워드가 없습니다
+            </p>
+          ) : (
+            <div className="divide-y">
+              {keywords.map((kw) => (
+                <div
+                  key={kw.id}
+                  className="flex items-center justify-between px-4 py-3 hover:bg-muted/50"
+                >
+                  <div>
+                    <p className="text-sm font-medium">
+                      {kw.language.toUpperCase()} — {kw.severity === "urgent" ? t("followups.severity.urgent") : t("followups.severity.normal")}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {kw.keywords.join(", ")}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export default function ProceduresPage() {
   const [activeTab, setActiveTab] = useState<TabId>("clinic");
 
@@ -985,6 +1275,7 @@ export default function ProceduresPage() {
         {activeTab === "pricing" && <PricingTab />}
         {activeTab === "packages" && <PackagesTab />}
         {activeTab === "protocols" && <ProtocolsTab />}
+        {activeTab === "followups" && <FollowupsTab />}
       </div>
     </div>
   );

@@ -12,12 +12,14 @@ from app.core.exceptions import NotFoundError
 from app.dependencies import get_current_user
 from app.models.ab_test import ABTest, ABTestResult, ABTestVariant
 from app.models.booking import Booking
+from app.models.clinic_procedure import ClinicProcedure
 from app.models.consultation_performance import ConsultationPerformance
 from app.models.conversation import Conversation
 from app.models.customer import Customer
 from app.models.message import Message
 from app.models.messenger_account import MessengerAccount
 from app.models.payment import Payment
+from app.models.procedure import Procedure
 from app.models.user import User
 from app.schemas.analytics import (
     AnalyticsOverviewResponse,
@@ -617,3 +619,208 @@ async def _funnel_by_both(db: AsyncSession, clinic_id, cutoff):
             "payment_rate": round(pmts / bkgs * 100, 1) if bkgs > 0 else 0,
         })
     return groups
+
+
+# --- Revenue / Margin deep analytics ---
+
+
+@router.get("/procedure-profitability")
+async def get_procedure_profitability(
+    days: int = Query(default=30, ge=1, le=365),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Per-procedure revenue, material cost, and margin analysis."""
+    clinic_id = current_user.clinic_id
+    cutoff = date.today() - timedelta(days=days)
+
+    result = await db.execute(
+        select(
+            Procedure.id.label("procedure_id"),
+            Procedure.name_ko.label("procedure_name"),
+            func.count(Payment.id).label("case_count"),
+            func.coalesce(func.sum(Payment.amount), 0).label("total_revenue"),
+            func.coalesce(func.avg(Payment.amount), 0).label("avg_ticket"),
+            ClinicProcedure.material_cost,
+        )
+        .select_from(Payment)
+        .join(Booking, Payment.booking_id == Booking.id)
+        .join(ClinicProcedure, Booking.clinic_procedure_id == ClinicProcedure.id)
+        .join(Procedure, ClinicProcedure.procedure_id == Procedure.id)
+        .where(
+            Payment.clinic_id == clinic_id,
+            Payment.status == "completed",
+            func.date(Payment.created_at) >= cutoff,
+        )
+        .group_by(Procedure.id, Procedure.name_ko, ClinicProcedure.material_cost)
+        .order_by(func.sum(Payment.amount).desc())
+    )
+    rows = result.all()
+
+    procedures = []
+    for row in rows:
+        revenue = float(row.total_revenue)
+        material = float(row.material_cost or 0) * row.case_count
+        margin = revenue - material
+        margin_rate = round(margin / revenue * 100, 1) if revenue > 0 else 0
+        procedures.append({
+            "procedure_id": str(row.procedure_id),
+            "procedure_name": row.procedure_name,
+            "case_count": row.case_count,
+            "total_revenue": revenue,
+            "avg_ticket": round(float(row.avg_ticket), 0),
+            "total_material_cost": material,
+            "gross_margin": margin,
+            "margin_rate": margin_rate,
+        })
+
+    procedures.sort(key=lambda x: x["margin_rate"], reverse=True)
+
+    return {"days": days, "procedures": procedures}
+
+
+@router.get("/customer-lifetime-value")
+async def get_customer_lifetime_value(
+    days: int = Query(default=365, ge=30, le=1095),
+    top_n: int = Query(default=20, ge=1, le=100),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Customer lifetime value analysis with nationality breakdown."""
+    clinic_id = current_user.clinic_id
+    cutoff = date.today() - timedelta(days=days)
+
+    result = await db.execute(
+        select(
+            Customer.id.label("customer_id"),
+            Customer.name.label("customer_name"),
+            Customer.country_code,
+            func.coalesce(func.sum(Payment.amount), 0).label("total_payments"),
+            func.count(func.distinct(Booking.booking_date)).label("visit_count"),
+            func.min(Booking.booking_date).label("first_visit"),
+            func.max(Booking.booking_date).label("last_visit"),
+            func.coalesce(func.avg(Payment.amount), 0).label("avg_ticket"),
+        )
+        .select_from(Customer)
+        .join(Payment, Payment.customer_id == Customer.id)
+        .join(Booking, Payment.booking_id == Booking.id)
+        .where(
+            Payment.clinic_id == clinic_id,
+            Payment.status == "completed",
+            func.date(Payment.created_at) >= cutoff,
+        )
+        .group_by(Customer.id, Customer.name, Customer.country_code)
+        .order_by(func.sum(Payment.amount).desc())
+        .limit(top_n)
+    )
+    rows = result.all()
+
+    customers = []
+    for row in rows:
+        total = float(row.total_payments)
+        first_visit = row.first_visit
+        last_visit = row.last_visit
+        months_active = 1
+        if first_visit and last_visit and last_visit > first_visit:
+            delta = last_visit - first_visit
+            months_active = max(1, delta.days / 30)
+        predicted_annual = round(total / months_active * 12, 0)
+
+        customers.append({
+            "customer_id": str(row.customer_id),
+            "customer_name": row.customer_name,
+            "country_code": row.country_code or "unknown",
+            "total_payments": total,
+            "visit_count": row.visit_count,
+            "first_visit": str(first_visit) if first_visit else None,
+            "last_visit": str(last_visit) if last_visit else None,
+            "avg_ticket": round(float(row.avg_ticket), 0),
+            "predicted_annual_value": predicted_annual,
+        })
+
+    # Nationality average CLV
+    nat_agg_result = await db.execute(
+        select(
+            Customer.country_code,
+            func.sum(Payment.amount).label("customer_total"),
+        )
+        .select_from(Customer)
+        .join(Payment, Payment.customer_id == Customer.id)
+        .where(
+            Payment.clinic_id == clinic_id,
+            Payment.status == "completed",
+            func.date(Payment.created_at) >= cutoff,
+        )
+        .group_by(Customer.id, Customer.country_code)
+    )
+    nat_data: dict[str, list[float]] = {}
+    for row in nat_agg_result.all():
+        cc = row.country_code or "unknown"
+        if cc not in nat_data:
+            nat_data[cc] = []
+        nat_data[cc].append(float(row.customer_total or 0))
+
+    nationality_avg = [
+        {
+            "country_code": cc,
+            "avg_clv": round(sum(vals) / len(vals), 0) if vals else 0,
+            "customer_count": len(vals),
+        }
+        for cc, vals in sorted(nat_data.items())
+    ]
+
+    return {
+        "days": days,
+        "top_n": top_n,
+        "customers": customers,
+        "nationality_avg": nationality_avg,
+    }
+
+
+@router.get("/revenue-heatmap")
+async def get_revenue_heatmap(
+    days: int = Query(default=30, ge=1, le=365),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Revenue heatmap by day-of-week and hour."""
+    clinic_id = current_user.clinic_id
+    cutoff = date.today() - timedelta(days=days)
+
+    result = await db.execute(
+        select(
+            func.extract("dow", Payment.paid_at).label("day_of_week"),
+            func.extract("hour", Payment.paid_at).label("hour"),
+            func.count(Payment.id).label("count"),
+            func.coalesce(func.sum(Payment.amount), 0).label("total_amount"),
+        )
+        .where(
+            Payment.clinic_id == clinic_id,
+            Payment.status == "completed",
+            Payment.paid_at.isnot(None),
+            func.date(Payment.paid_at) >= cutoff,
+        )
+        .group_by(
+            func.extract("dow", Payment.paid_at),
+            func.extract("hour", Payment.paid_at),
+        )
+    )
+    rows = result.all()
+
+    heatmap = []
+    for row in rows:
+        heatmap.append({
+            "day_of_week": int(row.day_of_week),
+            "hour": int(row.hour),
+            "count": row.count,
+            "total_amount": float(row.total_amount),
+        })
+
+    sorted_slots = sorted(heatmap, key=lambda x: x["total_amount"], reverse=True)
+    peak_slots = sorted_slots[:5]
+
+    return {
+        "days": days,
+        "heatmap": heatmap,
+        "peak_slots": peak_slots,
+    }

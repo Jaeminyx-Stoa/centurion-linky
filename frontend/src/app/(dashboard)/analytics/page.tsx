@@ -14,6 +14,7 @@ import {
   Heart,
   Activity,
   Filter,
+  DollarSign,
 } from "lucide-react";
 
 import { useAuthStore } from "@/stores/auth";
@@ -27,7 +28,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-type TabId = "overview" | "performance" | "satisfaction" | "crm" | "funnel";
+type TabId = "overview" | "performance" | "satisfaction" | "crm" | "funnel" | "revenue";
 
 const TABS: { id: TabId; label: string; icon: React.ElementType }[] = [
   { id: "overview", label: "Overview", icon: BarChart3 },
@@ -35,6 +36,7 @@ const TABS: { id: TabId; label: string; icon: React.ElementType }[] = [
   { id: "satisfaction", label: "만족도", icon: Heart },
   { id: "crm", label: "CRM 통계", icon: Activity },
   { id: "funnel", label: "전환 분석", icon: Filter },
+  { id: "revenue", label: "매출 분석", icon: DollarSign },
 ];
 
 function StatCard({
@@ -827,6 +829,277 @@ function FunnelTab() {
   );
 }
 
+interface ProcedureProfit {
+  procedure_id: string;
+  procedure_name: string;
+  case_count: number;
+  total_revenue: number;
+  avg_ticket: number;
+  total_material_cost: number;
+  gross_margin: number;
+  margin_rate: number;
+}
+
+interface CLVCustomer {
+  customer_id: string;
+  customer_name: string;
+  country_code: string;
+  total_payments: number;
+  visit_count: number;
+  avg_ticket: number;
+  predicted_annual_value: number;
+}
+
+interface HeatmapCell {
+  day_of_week: number;
+  hour: number;
+  count: number;
+  total_amount: number;
+}
+
+const DAY_NAMES = ["일", "월", "화", "수", "목", "금", "토"];
+
+function marginColor(rate: number) {
+  if (rate >= 70) return "text-green-600";
+  if (rate >= 40) return "text-yellow-600";
+  return "text-red-600";
+}
+
+function RevenueTab() {
+  const { accessToken } = useAuthStore();
+  const t = useT();
+  const [days, setDays] = useState(30);
+  const [profitData, setProfitData] = useState<ProcedureProfit[]>([]);
+  const [clvData, setClvData] = useState<CLVCustomer[]>([]);
+  const [natAvg, setNatAvg] = useState<{ country_code: string; avg_clv: number; customer_count: number }[]>([]);
+  const [heatmap, setHeatmap] = useState<HeatmapCell[]>([]);
+  const [peakSlots, setPeakSlots] = useState<HeatmapCell[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!accessToken) return;
+    setLoading(true);
+    Promise.all([
+      api.get<{ procedures: ProcedureProfit[] }>(
+        `/api/v1/analytics/procedure-profitability?days=${days}`,
+        { token: accessToken },
+      ),
+      api.get<{ customers: CLVCustomer[]; nationality_avg: typeof natAvg }>(
+        `/api/v1/analytics/customer-lifetime-value?days=${Math.max(days, 30)}`,
+        { token: accessToken },
+      ),
+      api.get<{ heatmap: HeatmapCell[]; peak_slots: HeatmapCell[] }>(
+        `/api/v1/analytics/revenue-heatmap?days=${days}`,
+        { token: accessToken },
+      ),
+    ])
+      .then(([profitRes, clvRes, heatRes]) => {
+        setProfitData(profitRes.procedures);
+        setClvData(clvRes.customers);
+        setNatAvg(clvRes.nationality_avg);
+        setHeatmap(heatRes.heatmap);
+        setPeakSlots(heatRes.peak_slots);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [accessToken, days]);
+
+  // Build heatmap grid
+  const maxAmount = Math.max(...heatmap.map((c) => c.total_amount), 1);
+  const heatmapGrid: Record<string, HeatmapCell> = {};
+  for (const cell of heatmap) {
+    heatmapGrid[`${cell.day_of_week}-${cell.hour}`] = cell;
+  }
+
+  if (loading) {
+    return <p className="text-sm text-muted-foreground">{t("common.loading")}</p>;
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Period selector */}
+      <div className="flex items-center gap-2">
+        <select
+          value={days}
+          onChange={(e) => setDays(Number(e.target.value))}
+          className="rounded border px-3 py-1.5 text-sm"
+        >
+          {[7, 14, 30, 60, 90, 180, 365].map((d) => (
+            <option key={d} value={d}>
+              {d}{t("analytics.funnel.days")}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Procedure Profitability */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">{t("analytics.revenue.procedureProfit")}</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          {profitData.length === 0 ? (
+            <p className="p-4 text-sm text-muted-foreground">{t("common.noData")}</p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b bg-muted/50">
+                  <th className="px-4 py-2 text-left font-medium">{t("analytics.revenue.procedureName")}</th>
+                  <th className="px-4 py-2 text-right font-medium">{t("analytics.revenue.cases")}</th>
+                  <th className="px-4 py-2 text-right font-medium">{t("analytics.revenue.totalRevenue")}</th>
+                  <th className="px-4 py-2 text-right font-medium">{t("analytics.revenue.materialCost")}</th>
+                  <th className="px-4 py-2 text-right font-medium">{t("analytics.revenue.grossMargin")}</th>
+                  <th className="px-4 py-2 text-right font-medium">{t("analytics.revenue.marginRate")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {profitData.map((p) => (
+                  <tr key={p.procedure_id} className="border-b last:border-b-0 hover:bg-muted/50">
+                    <td className="px-4 py-2 font-medium">{p.procedure_name}</td>
+                    <td className="px-4 py-2 text-right">{p.case_count}</td>
+                    <td className="px-4 py-2 text-right">{p.total_revenue.toLocaleString()}</td>
+                    <td className="px-4 py-2 text-right">{p.total_material_cost.toLocaleString()}</td>
+                    <td className="px-4 py-2 text-right">{p.gross_margin.toLocaleString()}</td>
+                    <td className={`px-4 py-2 text-right font-medium ${marginColor(p.margin_rate)}`}>
+                      {p.margin_rate}%
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* CLV */}
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">{t("analytics.revenue.clv")}</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            {clvData.length === 0 ? (
+              <p className="p-4 text-sm text-muted-foreground">{t("common.noData")}</p>
+            ) : (
+              <div className="divide-y">
+                {clvData.slice(0, 10).map((c) => (
+                  <div key={c.customer_id} className="flex items-center justify-between px-4 py-2">
+                    <div>
+                      <p className="text-sm font-medium">{c.customer_name || c.customer_id.slice(0, 8)}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {c.country_code} | {c.visit_count}{t("analytics.revenue.visitCount")}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-medium">{c.total_payments.toLocaleString()}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {t("analytics.revenue.predictedAnnual")}: {c.predicted_annual_value.toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">{t("analytics.revenue.nationalityAvg")}</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            {natAvg.length === 0 ? (
+              <p className="p-4 text-sm text-muted-foreground">{t("common.noData")}</p>
+            ) : (
+              <div className="divide-y">
+                {natAvg.map((n) => (
+                  <div key={n.country_code} className="flex items-center justify-between px-4 py-2">
+                    <span className="text-sm font-medium">{n.country_code}</span>
+                    <div className="text-right">
+                      <span className="text-sm">{n.avg_clv.toLocaleString()}</span>
+                      <span className="ml-2 text-xs text-muted-foreground">({n.customer_count}명)</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Revenue Heatmap */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">{t("analytics.revenue.heatmap")}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {heatmap.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{t("common.noData")}</p>
+          ) : (
+            <div className="space-y-4">
+              <div className="overflow-x-auto">
+                <div className="inline-grid gap-0.5" style={{ gridTemplateColumns: `60px repeat(24, 1fr)` }}>
+                  {/* Header row: hours */}
+                  <div />
+                  {Array.from({ length: 24 }, (_, h) => (
+                    <div key={h} className="text-center text-[10px] text-muted-foreground">
+                      {h}
+                    </div>
+                  ))}
+
+                  {/* Data rows */}
+                  {Array.from({ length: 7 }, (_, d) => (
+                    <>
+                      <div key={`label-${d}`} className="flex items-center text-xs font-medium">
+                        {DAY_NAMES[d]}
+                      </div>
+                      {Array.from({ length: 24 }, (_, h) => {
+                        const cell = heatmapGrid[`${d}-${h}`];
+                        const intensity = cell
+                          ? Math.min(cell.total_amount / maxAmount, 1)
+                          : 0;
+                        return (
+                          <div
+                            key={`${d}-${h}`}
+                            className="aspect-square rounded-sm border"
+                            style={{
+                              backgroundColor: intensity > 0
+                                ? `rgba(59, 130, 246, ${0.1 + intensity * 0.8})`
+                                : undefined,
+                            }}
+                            title={cell ? `${DAY_NAMES[d]} ${h}시: ${cell.count}건, ${cell.total_amount.toLocaleString()}원` : ""}
+                          />
+                        );
+                      })}
+                    </>
+                  ))}
+                </div>
+              </div>
+
+              {/* Peak Slots */}
+              {peakSlots.length > 0 && (
+                <div>
+                  <p className="mb-2 text-sm font-medium">{t("analytics.revenue.peakSlots")}</p>
+                  <div className="flex flex-wrap gap-2">
+                    {peakSlots.map((slot, idx) => (
+                      <span
+                        key={idx}
+                        className="rounded bg-blue-50 px-2 py-1 text-xs text-blue-700"
+                      >
+                        {DAY_NAMES[slot.day_of_week]} {slot.hour}시 — {slot.total_amount.toLocaleString()}원 ({slot.count}건)
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export default function AnalyticsPage() {
   const { accessToken } = useAuthStore();
   const { isLoading, error, fetchAll } = useAnalyticsStore();
@@ -907,6 +1180,7 @@ export default function AnalyticsPage() {
         {activeTab === "satisfaction" && <SatisfactionTab />}
         {activeTab === "crm" && <CRMStatsTab />}
         {activeTab === "funnel" && <FunnelTab />}
+        {activeTab === "revenue" && <RevenueTab />}
       </div>
     </div>
   );
