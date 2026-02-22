@@ -360,6 +360,53 @@ const ko = {
   "documents.selectConversation": "대화 ID",
   "documents.selectBooking": "예약 ID",
   "documents.language": "언어",
+
+  // Treatment Photos
+  "nav.photos": "시술 사진",
+  "photos.title": "시술 전후 사진",
+  "photos.empty": "등록된 사진이 없습니다",
+  "photos.before": "시술 전",
+  "photos.after": "시술 후",
+  "photos.progress": "경과",
+  "photos.daysAfter": "일 경과",
+  "photos.consent": "동의",
+  "photos.consentGiven": "환자 동의 완료",
+  "photos.approve": "포트폴리오 승인",
+  "photos.portfolio": "포트폴리오",
+
+  // Translation QA
+  "nav.translationQA": "번역 QA",
+  "translationQA.title": "번역 품질 관리",
+  "translationQA.empty": "리포트가 없습니다",
+  "translationQA.totalReports": "총 리포트",
+  "translationQA.pending": "검토 대기",
+  "translationQA.resolved": "해결 완료",
+  "translationQA.accuracy": "번역 정확도",
+  "translationQA.byErrorType": "오류 유형별",
+  "translationQA.byLanguage": "언어 쌍별",
+  "translationQA.original": "원문",
+  "translationQA.translated": "번역",
+  "translationQA.corrected": "수정",
+  "translationQA.resolve": "해결",
+  "translationQA.dismiss": "무시",
+
+  // Churn Risk
+  "churn.totalCustomers": "전체 고객",
+  "churn.dueThisWeek": "이번 주 예정",
+  "churn.dueThisMonth": "이번 달 예정",
+  "churn.overdue": "초과",
+  "churn.avgRisk": "평균 위험도",
+  "churn.minRisk": "최소 위험도",
+  "churn.critical": "위험",
+  "churn.high": "높음",
+  "churn.medium": "보통",
+  "churn.atRiskCustomers": "이탈 위험 고객",
+  "churn.customer": "고객",
+  "churn.lastVisit": "마지막 방문",
+  "churn.lastProcedure": "최근 시술",
+  "churn.overdueDays": "초과 일수",
+  "churn.riskScore": "위험 점수",
+  "churn.level": "등급",
 } as const;
 
 export default ko;

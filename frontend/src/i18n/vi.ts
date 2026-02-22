@@ -362,6 +362,53 @@ const vi: Record<TranslationKey, string> = {
   "documents.selectConversation": "ID cuộc trò chuyện",
   "documents.selectBooking": "ID đặt lịch",
   "documents.language": "Ngôn ngữ",
+
+  // Treatment Photos
+  "nav.photos": "Ảnh điều trị",
+  "photos.title": "Ảnh trước/sau điều trị",
+  "photos.empty": "Chưa có ảnh",
+  "photos.before": "Trước",
+  "photos.after": "Sau",
+  "photos.progress": "Tiến triển",
+  "photos.daysAfter": " ngày sau",
+  "photos.consent": "Đồng ý",
+  "photos.consentGiven": "Bệnh nhân đã đồng ý",
+  "photos.approve": "Duyệt portfolio",
+  "photos.portfolio": "Portfolio",
+
+  // Translation QA
+  "nav.translationQA": "QA Dịch thuật",
+  "translationQA.title": "Quản lý chất lượng dịch thuật",
+  "translationQA.empty": "Chưa có báo cáo",
+  "translationQA.totalReports": "Tổng báo cáo",
+  "translationQA.pending": "Chờ xem xét",
+  "translationQA.resolved": "Đã giải quyết",
+  "translationQA.accuracy": "Độ chính xác",
+  "translationQA.byErrorType": "Theo loại lỗi",
+  "translationQA.byLanguage": "Theo cặp ngôn ngữ",
+  "translationQA.original": "Bản gốc",
+  "translationQA.translated": "Bản dịch",
+  "translationQA.corrected": "Đã sửa",
+  "translationQA.resolve": "Giải quyết",
+  "translationQA.dismiss": "Bỏ qua",
+
+  // Churn Risk
+  "churn.totalCustomers": "Tổng khách hàng",
+  "churn.dueThisWeek": "Đến hạn tuần này",
+  "churn.dueThisMonth": "Đến hạn tháng này",
+  "churn.overdue": "Quá hạn",
+  "churn.avgRisk": "Rủi ro TB",
+  "churn.minRisk": "Rủi ro tối thiểu",
+  "churn.critical": "Nguy hiểm",
+  "churn.high": "Cao",
+  "churn.medium": "Trung bình",
+  "churn.atRiskCustomers": "Khách hàng có nguy cơ",
+  "churn.customer": "Khách hàng",
+  "churn.lastVisit": "Lần cuối đến",
+  "churn.lastProcedure": "Thủ thuật gần nhất",
+  "churn.overdueDays": "Ngày quá hạn",
+  "churn.riskScore": "Điểm rủi ro",
+  "churn.level": "Cấp độ",
 };
 
 export default vi;

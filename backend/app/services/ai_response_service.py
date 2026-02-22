@@ -158,6 +158,23 @@ class AIResponseService:
         except Exception:
             logger.exception("Side-effect detection failed")
 
+        # 7.7 Real-time contraindication auto-screening
+        try:
+            from app.services.contraindication_screening_service import (
+                ContraindicationScreeningService,
+            )
+
+            screening_svc = ContraindicationScreeningService(self.db)
+            contra_alert = await screening_svc.screen_message(
+                query, conversation_id, conversation.clinic_id
+            )
+            if contra_alert:
+                await manager.broadcast_to_clinic(
+                    conversation.clinic_id, contra_alert
+                )
+        except Exception:
+            logger.exception("Contraindication screening failed")
+
         # 8. Run consultation
         try:
             result = await self.consultation_service.consult(

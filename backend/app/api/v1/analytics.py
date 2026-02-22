@@ -824,3 +824,55 @@ async def get_revenue_heatmap(
         "heatmap": heatmap,
         "peak_slots": peak_slots,
     }
+
+
+# --- Churn Risk / Revisit Prediction ---
+
+
+@router.get("/churn-risk")
+async def get_churn_risk(
+    min_risk: int = Query(default=30, ge=0, le=100),
+    limit: int = Query(default=50, ge=1, le=200),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get customers sorted by churn risk score."""
+    from app.services.revisit_prediction_service import RevisitPredictionService
+
+    svc = RevisitPredictionService(db)
+    customers = await svc.get_churn_risk_customers(
+        clinic_id=current_user.clinic_id,
+        min_risk=min_risk,
+        limit=limit,
+    )
+
+    critical = sum(1 for c in customers if c["risk_level"] == "critical")
+    high = sum(1 for c in customers if c["risk_level"] == "high")
+    medium = sum(1 for c in customers if c["risk_level"] == "medium")
+
+    return {
+        "total_at_risk": len(customers),
+        "critical_count": critical,
+        "high_count": high,
+        "medium_count": medium,
+        "customers": [
+            {
+                **c,
+                "customer_id": str(c["customer_id"]),
+                "last_visit": str(c["last_visit"]) if c["last_visit"] else None,
+            }
+            for c in customers
+        ],
+    }
+
+
+@router.get("/revisit-summary")
+async def get_revisit_summary(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get revisit prediction summary."""
+    from app.services.revisit_prediction_service import RevisitPredictionService
+
+    svc = RevisitPredictionService(db)
+    return await svc.get_revisit_summary(current_user.clinic_id)

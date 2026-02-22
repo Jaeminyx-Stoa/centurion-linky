@@ -362,6 +362,53 @@ const zh: Record<TranslationKey, string> = {
   "documents.selectConversation": "对话ID",
   "documents.selectBooking": "预约ID",
   "documents.language": "语言",
+
+  // Treatment Photos
+  "nav.photos": "治疗照片",
+  "photos.title": "术前术后照片",
+  "photos.empty": "暂无照片",
+  "photos.before": "术前",
+  "photos.after": "术后",
+  "photos.progress": "恢复进度",
+  "photos.daysAfter": "天后",
+  "photos.consent": "同意",
+  "photos.consentGiven": "患者已同意",
+  "photos.approve": "批准展示",
+  "photos.portfolio": "作品集",
+
+  // Translation QA
+  "nav.translationQA": "翻译QA",
+  "translationQA.title": "翻译质量管理",
+  "translationQA.empty": "暂无报告",
+  "translationQA.totalReports": "总报告数",
+  "translationQA.pending": "待审核",
+  "translationQA.resolved": "已解决",
+  "translationQA.accuracy": "翻译准确率",
+  "translationQA.byErrorType": "按错误类型",
+  "translationQA.byLanguage": "按语言对",
+  "translationQA.original": "原文",
+  "translationQA.translated": "译文",
+  "translationQA.corrected": "修正",
+  "translationQA.resolve": "解决",
+  "translationQA.dismiss": "忽略",
+
+  // Churn Risk
+  "churn.totalCustomers": "全部客户",
+  "churn.dueThisWeek": "本周到期",
+  "churn.dueThisMonth": "本月到期",
+  "churn.overdue": "逾期",
+  "churn.avgRisk": "平均风险",
+  "churn.minRisk": "最低风险",
+  "churn.critical": "危险",
+  "churn.high": "高",
+  "churn.medium": "中",
+  "churn.atRiskCustomers": "流失风险客户",
+  "churn.customer": "客户",
+  "churn.lastVisit": "最后到访",
+  "churn.lastProcedure": "最近项目",
+  "churn.overdueDays": "逾期天数",
+  "churn.riskScore": "风险分数",
+  "churn.level": "等级",
 };
 
 export default zh;

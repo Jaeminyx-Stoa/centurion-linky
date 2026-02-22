@@ -362,6 +362,53 @@ const en: Record<TranslationKey, string> = {
   "documents.selectConversation": "Conversation ID",
   "documents.selectBooking": "Booking ID",
   "documents.language": "Language",
+
+  // Treatment Photos
+  "nav.photos": "Photos",
+  "photos.title": "Treatment Photos",
+  "photos.empty": "No photos found",
+  "photos.before": "Before",
+  "photos.after": "After",
+  "photos.progress": "Progress",
+  "photos.daysAfter": " days after",
+  "photos.consent": "Consent",
+  "photos.consentGiven": "Patient consent given",
+  "photos.approve": "Approve for Portfolio",
+  "photos.portfolio": "Portfolio",
+
+  // Translation QA
+  "nav.translationQA": "Translation QA",
+  "translationQA.title": "Translation Quality Assurance",
+  "translationQA.empty": "No reports found",
+  "translationQA.totalReports": "Total Reports",
+  "translationQA.pending": "Pending Review",
+  "translationQA.resolved": "Resolved",
+  "translationQA.accuracy": "Accuracy",
+  "translationQA.byErrorType": "By Error Type",
+  "translationQA.byLanguage": "By Language Pair",
+  "translationQA.original": "Original",
+  "translationQA.translated": "Translated",
+  "translationQA.corrected": "Corrected",
+  "translationQA.resolve": "Resolve",
+  "translationQA.dismiss": "Dismiss",
+
+  // Churn Risk
+  "churn.totalCustomers": "Total Customers",
+  "churn.dueThisWeek": "Due This Week",
+  "churn.dueThisMonth": "Due This Month",
+  "churn.overdue": "Overdue",
+  "churn.avgRisk": "Avg Risk",
+  "churn.minRisk": "Min Risk",
+  "churn.critical": "Critical",
+  "churn.high": "High",
+  "churn.medium": "Medium",
+  "churn.atRiskCustomers": "At-Risk Customers",
+  "churn.customer": "Customer",
+  "churn.lastVisit": "Last Visit",
+  "churn.lastProcedure": "Last Procedure",
+  "churn.overdueDays": "Overdue Days",
+  "churn.riskScore": "Risk Score",
+  "churn.level": "Level",
 };
 
 export default en;

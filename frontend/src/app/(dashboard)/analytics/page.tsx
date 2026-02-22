@@ -28,7 +28,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-type TabId = "overview" | "performance" | "satisfaction" | "crm" | "funnel" | "revenue";
+type TabId = "overview" | "performance" | "satisfaction" | "crm" | "funnel" | "revenue" | "churn";
 
 const TABS: { id: TabId; label: string; icon: React.ElementType }[] = [
   { id: "overview", label: "Overview", icon: BarChart3 },
@@ -37,6 +37,7 @@ const TABS: { id: TabId; label: string; icon: React.ElementType }[] = [
   { id: "crm", label: "CRM 통계", icon: Activity },
   { id: "funnel", label: "전환 분석", icon: Filter },
   { id: "revenue", label: "매출 분석", icon: DollarSign },
+  { id: "churn", label: "이탈 위험", icon: Users },
 ];
 
 function StatCard({
@@ -1100,6 +1101,177 @@ function RevenueTab() {
   );
 }
 
+interface ChurnCustomer {
+  customer_id: string;
+  customer_name: string | null;
+  country_code: string | null;
+  last_visit: string | null;
+  days_since_last_visit: number;
+  visit_count: number;
+  total_payments: number;
+  procedure_name: string | null;
+  expected_revisit_days: number | null;
+  overdue_days: number;
+  churn_risk_score: number;
+  risk_level: string;
+  revisit_intention: string | null;
+}
+
+interface ChurnData {
+  total_at_risk: number;
+  critical_count: number;
+  high_count: number;
+  medium_count: number;
+  customers: ChurnCustomer[];
+}
+
+interface RevisitSummaryData {
+  total_customers: number;
+  due_this_week: number;
+  due_this_month: number;
+  overdue: number;
+  avg_churn_risk: number;
+}
+
+function riskBadge(level: string) {
+  const colors: Record<string, string> = {
+    critical: "bg-red-100 text-red-700",
+    high: "bg-orange-100 text-orange-700",
+    medium: "bg-yellow-100 text-yellow-700",
+    low: "bg-green-100 text-green-700",
+  };
+  return colors[level] || "bg-gray-100 text-gray-700";
+}
+
+function ChurnRiskTab() {
+  const { accessToken } = useAuthStore();
+  const t = useT();
+  const [data, setData] = useState<ChurnData | null>(null);
+  const [summary, setSummary] = useState<RevisitSummaryData | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [minRisk, setMinRisk] = useState(30);
+
+  useEffect(() => {
+    if (!accessToken) return;
+    setLoading(true);
+    Promise.all([
+      api.get<ChurnData>(
+        `/api/v1/analytics/churn-risk?min_risk=${minRisk}`,
+        { token: accessToken },
+      ),
+      api.get<RevisitSummaryData>(
+        "/api/v1/analytics/revisit-summary",
+        { token: accessToken },
+      ),
+    ])
+      .then(([churnRes, summaryRes]) => {
+        setData(churnRes);
+        setSummary(summaryRes);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [accessToken, minRisk]);
+
+  if (loading) {
+    return <p className="text-sm text-muted-foreground">{t("common.loading")}</p>;
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Summary Cards */}
+      {summary && (
+        <div className="grid grid-cols-5 gap-4">
+          <StatCard label={t("churn.totalCustomers")} value={summary.total_customers} icon={Users} />
+          <StatCard label={t("churn.dueThisWeek")} value={summary.due_this_week} icon={Clock} color="text-yellow-500" />
+          <StatCard label={t("churn.dueThisMonth")} value={summary.due_this_month} icon={Clock} color="text-blue-500" />
+          <StatCard label={t("churn.overdue")} value={summary.overdue} icon={AlertCircle} color="text-red-500" />
+          <StatCard label={t("churn.avgRisk")} value={`${summary.avg_churn_risk}%`} icon={Activity} color="text-orange-500" />
+        </div>
+      )}
+
+      {/* Risk Level Filter */}
+      <div className="flex items-center gap-2">
+        <span className="text-sm text-muted-foreground">{t("churn.minRisk")}:</span>
+        <select
+          value={minRisk}
+          onChange={(e) => setMinRisk(Number(e.target.value))}
+          className="rounded border px-3 py-1.5 text-sm"
+        >
+          {[0, 30, 50, 75].map((r) => (
+            <option key={r} value={r}>{r}+</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Risk Distribution */}
+      {data && (
+        <div className="grid grid-cols-3 gap-4">
+          <StatCard label={t("churn.critical")} value={data.critical_count} icon={AlertCircle} color="text-red-500" />
+          <StatCard label={t("churn.high")} value={data.high_count} icon={TrendingUp} color="text-orange-500" />
+          <StatCard label={t("churn.medium")} value={data.medium_count} icon={Activity} color="text-yellow-500" />
+        </div>
+      )}
+
+      {/* Customer List */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">{t("churn.atRiskCustomers")}</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          {!data || data.customers.length === 0 ? (
+            <p className="p-4 text-sm text-muted-foreground">{t("common.noData")}</p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b bg-muted/50">
+                  <th className="px-4 py-2 text-left font-medium">{t("churn.customer")}</th>
+                  <th className="px-4 py-2 text-right font-medium">{t("churn.lastVisit")}</th>
+                  <th className="px-4 py-2 text-left font-medium">{t("churn.lastProcedure")}</th>
+                  <th className="px-4 py-2 text-right font-medium">{t("churn.overdueDays")}</th>
+                  <th className="px-4 py-2 text-right font-medium">{t("churn.riskScore")}</th>
+                  <th className="px-4 py-2 text-center font-medium">{t("churn.level")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.customers.map((c) => (
+                  <tr key={c.customer_id} className="border-b last:border-b-0 hover:bg-muted/50">
+                    <td className="px-4 py-2">
+                      <div>
+                        <p className="font-medium">{c.customer_name || c.customer_id.slice(0, 8)}</p>
+                        <p className="text-xs text-muted-foreground">{c.country_code || ""}</p>
+                      </div>
+                    </td>
+                    <td className="px-4 py-2 text-right">
+                      {c.last_visit || "-"}
+                      <span className="ml-1 text-xs text-muted-foreground">
+                        ({c.days_since_last_visit}{t("analytics.funnel.days")})
+                      </span>
+                    </td>
+                    <td className="px-4 py-2">{c.procedure_name || "-"}</td>
+                    <td className="px-4 py-2 text-right">
+                      {c.overdue_days > 0 ? (
+                        <span className="text-red-600">+{c.overdue_days}{t("analytics.funnel.days")}</span>
+                      ) : (
+                        <span className="text-green-600">-</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2 text-right font-medium">{c.churn_risk_score}</td>
+                    <td className="px-4 py-2 text-center">
+                      <span className={`rounded px-2 py-0.5 text-xs ${riskBadge(c.risk_level)}`}>
+                        {c.risk_level}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export default function AnalyticsPage() {
   const { accessToken } = useAuthStore();
   const { isLoading, error, fetchAll } = useAnalyticsStore();
@@ -1181,6 +1353,7 @@ export default function AnalyticsPage() {
         {activeTab === "crm" && <CRMStatsTab />}
         {activeTab === "funnel" && <FunnelTab />}
         {activeTab === "revenue" && <RevenueTab />}
+        {activeTab === "churn" && <ChurnRiskTab />}
       </div>
     </div>
   );

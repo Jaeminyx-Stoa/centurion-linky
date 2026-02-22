@@ -362,6 +362,53 @@ const ja: Record<TranslationKey, string> = {
   "documents.selectConversation": "会話ID",
   "documents.selectBooking": "予約ID",
   "documents.language": "言語",
+
+  // Treatment Photos
+  "nav.photos": "施術写真",
+  "photos.title": "施術前後写真",
+  "photos.empty": "写真がありません",
+  "photos.before": "施術前",
+  "photos.after": "施術後",
+  "photos.progress": "経過",
+  "photos.daysAfter": "日後",
+  "photos.consent": "同意",
+  "photos.consentGiven": "患者同意済み",
+  "photos.approve": "ポートフォリオ承認",
+  "photos.portfolio": "ポートフォリオ",
+
+  // Translation QA
+  "nav.translationQA": "翻訳QA",
+  "translationQA.title": "翻訳品質管理",
+  "translationQA.empty": "レポートがありません",
+  "translationQA.totalReports": "総レポート",
+  "translationQA.pending": "レビュー待ち",
+  "translationQA.resolved": "解決済み",
+  "translationQA.accuracy": "翻訳精度",
+  "translationQA.byErrorType": "エラー種別",
+  "translationQA.byLanguage": "言語ペア別",
+  "translationQA.original": "原文",
+  "translationQA.translated": "翻訳",
+  "translationQA.corrected": "修正",
+  "translationQA.resolve": "解決",
+  "translationQA.dismiss": "却下",
+
+  // Churn Risk
+  "churn.totalCustomers": "全顧客",
+  "churn.dueThisWeek": "今週予定",
+  "churn.dueThisMonth": "今月予定",
+  "churn.overdue": "超過",
+  "churn.avgRisk": "平均リスク",
+  "churn.minRisk": "最小リスク",
+  "churn.critical": "危険",
+  "churn.high": "高",
+  "churn.medium": "中",
+  "churn.atRiskCustomers": "離脱リスク顧客",
+  "churn.customer": "顧客",
+  "churn.lastVisit": "最終来院",
+  "churn.lastProcedure": "最終施術",
+  "churn.overdueDays": "超過日数",
+  "churn.riskScore": "リスクスコア",
+  "churn.level": "等級",
 };
 
 export default ja;

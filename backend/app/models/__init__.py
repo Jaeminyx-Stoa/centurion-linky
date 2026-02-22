@@ -30,6 +30,8 @@ from app.models.satisfaction_score import SatisfactionScore
 from app.models.simulation import SimulationResult, SimulationSession
 from app.models.satisfaction_survey import SatisfactionSurvey
 from app.models.settlement import Settlement
+from app.models.translation_report import TranslationReport
+from app.models.treatment_photo import TreatmentPhoto
 from app.models.user import User
 
 __all__ = [
@@ -68,5 +70,7 @@ __all__ = [
     "SimulationSession",
     "Settlement",
     "SideEffectKeyword",
+    "TranslationReport",
+    "TreatmentPhoto",
     "User",
 ]

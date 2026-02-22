@@ -61,6 +61,10 @@ class Customer(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     total_payments: Mapped[Decimal] = mapped_column(Numeric(15, 2), default=Decimal("0"))
     last_visit_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
+    # Churn/revisit prediction (cached)
+    churn_risk_score: Mapped[int | None] = mapped_column(Integer)
+    predicted_next_visit: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
     # Relationships
     clinic: Mapped["Clinic"] = relationship()  # noqa: F821
     conversations: Mapped[list["Conversation"]] = relationship(  # noqa: F821

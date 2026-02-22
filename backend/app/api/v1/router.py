@@ -28,6 +28,8 @@ from app.api.v1.simulations import router as simulations_router
 from app.api.v1.procedure_categories import router as procedure_categories_router
 from app.api.v1.procedures import router as procedures_router
 from app.api.v1.response_library import router as response_library_router
+from app.api.v1.translation_reports import router as translation_reports_router
+from app.api.v1.treatment_photos import router as treatment_photos_router
 from app.api.v1.uploads import router as uploads_router
 
 router = APIRouter(prefix="/api/v1")
@@ -59,4 +61,6 @@ router.include_router(simulations_router)
 router.include_router(procedure_categories_router)
 router.include_router(procedures_router)
 router.include_router(response_library_router)
+router.include_router(translation_reports_router)
+router.include_router(treatment_photos_router)
 router.include_router(uploads_router)
