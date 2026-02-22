@@ -11,10 +11,15 @@ import {
   FolderTree,
   Trash2,
   Save,
+  Package,
+  ClipboardCheck,
 } from "lucide-react";
 
 import { useAuthStore } from "@/stores/auth";
 import { useProcedureStore } from "@/stores/procedure";
+import { usePackageStore } from "@/stores/package";
+import { useProtocolStore } from "@/stores/protocol";
+import { useT } from "@/i18n";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,12 +31,14 @@ import {
 } from "@/components/ui/card";
 import type { ProcedureCategoryTree, ClinicProcedure } from "@/types/procedure";
 
-type TabId = "clinic" | "categories" | "pricing";
+type TabId = "clinic" | "categories" | "pricing" | "packages" | "protocols";
 
 const TABS: { id: TabId; label: string; icon: React.ElementType }[] = [
   { id: "clinic", label: "시술 목록", icon: Syringe },
   { id: "categories", label: "카테고리", icon: FolderTree },
   { id: "pricing", label: "가격 관리", icon: DollarSign },
+  { id: "packages", label: "패키지", icon: Package },
+  { id: "protocols", label: "상담 프로토콜", icon: ClipboardCheck },
 ];
 
 function CategoryItem({
@@ -603,6 +610,324 @@ function PricingTab() {
   );
 }
 
+function ProtocolsTab() {
+  const { accessToken } = useAuthStore();
+  const t = useT();
+  const { protocols, fetchProtocols, createProtocol } = useProtocolStore();
+  const [showCreate, setShowCreate] = useState(false);
+  const [name, setName] = useState("");
+  const [itemQuestion, setItemQuestion] = useState("");
+  const [items, setItems] = useState<
+    { id: string; question_ko: string; required: boolean; type: string }[]
+  >([]);
+
+  useEffect(() => {
+    if (accessToken) {
+      fetchProtocols(accessToken);
+    }
+  }, [accessToken, fetchProtocols]);
+
+  const handleAddItem = () => {
+    if (!itemQuestion.trim()) return;
+    setItems([
+      ...items,
+      {
+        id: `chk_${items.length + 1}`,
+        question_ko: itemQuestion.trim(),
+        required: true,
+        type: "boolean",
+      },
+    ]);
+    setItemQuestion("");
+  };
+
+  const handleCreate = async () => {
+    if (!accessToken || !name.trim() || items.length === 0) return;
+    await createProtocol(accessToken, {
+      name: name.trim(),
+      checklist_items: items,
+    });
+    setName("");
+    setItems([]);
+    setShowCreate(false);
+  };
+
+  return (
+    <div className="space-y-4 p-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-base font-semibold">{t("protocols.title")}</h2>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 text-xs"
+          onClick={() => setShowCreate(!showCreate)}
+        >
+          <Plus className="mr-1 h-3 w-3" />
+          {t("protocols.create")}
+        </Button>
+      </div>
+
+      {showCreate && (
+        <Card>
+          <CardContent className="space-y-3 pt-4">
+            <div className="space-y-2">
+              <Label htmlFor="proto-name">{t("protocols.name")}</Label>
+              <Input
+                id="proto-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="예: 보톡스 상담 프로토콜"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>{t("protocols.items")} ({items.length})</Label>
+              {items.map((item, idx) => (
+                <div
+                  key={item.id}
+                  className="flex items-center gap-2 rounded border px-2 py-1 text-xs"
+                >
+                  <span className="text-muted-foreground">{item.id}</span>
+                  <span className="flex-1">{item.question_ko}</span>
+                  <button
+                    onClick={() =>
+                      setItems(items.filter((_, i) => i !== idx))
+                    }
+                    className="text-muted-foreground hover:text-destructive"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+              <div className="flex gap-1">
+                <Input
+                  value={itemQuestion}
+                  onChange={(e) => setItemQuestion(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleAddItem()}
+                  className="h-7 text-xs"
+                  placeholder={t("protocols.question")}
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2"
+                  onClick={handleAddItem}
+                >
+                  <Plus className="h-3 w-3" />
+                </Button>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" onClick={handleCreate}>
+                {t("common.save")}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowCreate(false)}
+              >
+                {t("common.cancel")}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card>
+        <CardContent className="p-0">
+          {protocols.length === 0 ? (
+            <p className="p-4 text-sm text-muted-foreground">
+              {t("protocols.empty")}
+            </p>
+          ) : (
+            <div className="divide-y">
+              {protocols.map((proto) => {
+                const itemCount = proto.checklist_items?.length || 0;
+                return (
+                  <div
+                    key={proto.id}
+                    className="flex items-center justify-between px-4 py-3 hover:bg-muted/50"
+                  >
+                    <div>
+                      <p className="text-sm font-medium">{proto.name}</p>
+                      <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
+                        <span>
+                          {t("protocols.itemCount")}: {itemCount}
+                        </span>
+                        <span>
+                          {proto.procedure_id
+                            ? t("protocols.procedure")
+                            : t("protocols.global")}
+                        </span>
+                      </div>
+                    </div>
+                    {!proto.is_active && (
+                      <span className="rounded bg-red-100 px-1.5 py-0.5 text-[10px] text-red-700">
+                        비활성
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function PackagesTab() {
+  const { accessToken } = useAuthStore();
+  const t = useT();
+  const { packages, isLoading, fetchPackages, createPackage } =
+    usePackageStore();
+  const [showCreate, setShowCreate] = useState(false);
+  const [nameKo, setNameKo] = useState("");
+  const [price, setPrice] = useState("");
+  const [totalSessions, setTotalSessions] = useState("1");
+  const [discount, setDiscount] = useState("");
+
+  useEffect(() => {
+    if (accessToken) {
+      fetchPackages(accessToken);
+    }
+  }, [accessToken, fetchPackages]);
+
+  const handleCreate = async () => {
+    if (!accessToken || !nameKo.trim()) return;
+    await createPackage(accessToken, {
+      name_ko: nameKo.trim(),
+      total_sessions: Number(totalSessions) || 1,
+      package_price: price ? Number(price) : undefined,
+      discount_rate: discount ? Number(discount) : undefined,
+    } as never);
+    setNameKo("");
+    setPrice("");
+    setTotalSessions("1");
+    setDiscount("");
+    setShowCreate(false);
+  };
+
+  return (
+    <div className="space-y-4 p-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-base font-semibold">{t("packages.title")}</h2>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 text-xs"
+          onClick={() => setShowCreate(!showCreate)}
+        >
+          <Plus className="mr-1 h-3 w-3" />
+          {t("packages.create")}
+        </Button>
+      </div>
+
+      {showCreate && (
+        <Card>
+          <CardContent className="space-y-3 pt-4">
+            <div className="space-y-2">
+              <Label htmlFor="pkg-name">{t("packages.name")}</Label>
+              <Input
+                id="pkg-name"
+                value={nameKo}
+                onChange={(e) => setNameKo(e.target.value)}
+                placeholder="예: 보톡스 3회 패키지"
+              />
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="pkg-sessions">{t("packages.totalSessions")}</Label>
+                <Input
+                  id="pkg-sessions"
+                  type="number"
+                  value={totalSessions}
+                  onChange={(e) => setTotalSessions(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="pkg-price">{t("packages.price")}</Label>
+                <Input
+                  id="pkg-price"
+                  type="number"
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  placeholder="1500000"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="pkg-discount">{t("packages.discount")} (%)</Label>
+                <Input
+                  id="pkg-discount"
+                  type="number"
+                  value={discount}
+                  onChange={(e) => setDiscount(e.target.value)}
+                  placeholder="20"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" onClick={handleCreate}>
+                {t("common.save")}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowCreate(false)}
+              >
+                {t("common.cancel")}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card>
+        <CardContent className="p-0">
+          {packages.length === 0 ? (
+            <p className="p-4 text-sm text-muted-foreground">
+              {t("packages.empty")}
+            </p>
+          ) : (
+            <div className="divide-y">
+              {packages.map((pkg) => (
+                <div
+                  key={pkg.id}
+                  className="flex items-center justify-between px-4 py-3 hover:bg-muted/50"
+                >
+                  <div>
+                    <p className="text-sm font-medium">{pkg.name_ko}</p>
+                    <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
+                      <span>
+                        {t("packages.totalSessions")}: {pkg.total_sessions}
+                      </span>
+                      {pkg.package_price != null && (
+                        <span>
+                          {Number(pkg.package_price).toLocaleString()}원
+                        </span>
+                      )}
+                      {pkg.discount_rate != null && (
+                        <span className="text-green-600">
+                          {t("packages.discount")}: {Number(pkg.discount_rate)}%
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {!pkg.is_active && (
+                    <span className="rounded bg-red-100 px-1.5 py-0.5 text-[10px] text-red-700">
+                      비활성
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export default function ProceduresPage() {
   const [activeTab, setActiveTab] = useState<TabId>("clinic");
 
@@ -658,6 +983,8 @@ export default function ProceduresPage() {
         {activeTab === "clinic" && <ClinicTab />}
         {activeTab === "categories" && <CategoriesTab />}
         {activeTab === "pricing" && <PricingTab />}
+        {activeTab === "packages" && <PackagesTab />}
+        {activeTab === "protocols" && <ProtocolsTab />}
       </div>
     </div>
   );

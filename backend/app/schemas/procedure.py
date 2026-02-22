@@ -29,6 +29,7 @@ class ProcedureCreate(BaseModel):
     pain_type: str | None = None
     anesthesia_options: str | None = None
     anesthesia_details: dict | None = None
+    contraindications: dict | None = None
 
 
 class ProcedureUpdate(BaseModel):
@@ -55,6 +56,7 @@ class ProcedureUpdate(BaseModel):
     pain_type: str | None = None
     anesthesia_options: str | None = None
     anesthesia_details: dict | None = None
+    contraindications: dict | None = None
     is_active: bool | None = None
 
 
@@ -84,6 +86,7 @@ class ProcedureResponse(BaseModel):
     pain_type: str | None
     anesthesia_options: str | None
     anesthesia_details: dict | None
+    contraindications: dict | None = None
     is_active: bool
     created_at: datetime
     updated_at: datetime

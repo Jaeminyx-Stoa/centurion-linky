@@ -15,6 +15,8 @@ from app.api.v1.llm_usage import router as llm_usage_router
 from app.api.v1.medical_terms import router as medical_terms_router
 from app.api.v1.messenger_accounts import router as messenger_accounts_router
 from app.api.v1.clinic_procedures import router as clinic_procedures_router
+from app.api.v1.packages import router as packages_router
+from app.api.v1.protocols import router as protocols_router
 from app.api.v1.payment_settings import router as payment_settings_router
 from app.api.v1.payments import router as payments_router
 from app.api.v1.pricing import router as pricing_router
@@ -36,6 +38,8 @@ router.include_router(auth_router)
 router.include_router(bookings_router)
 router.include_router(clinics_router)
 router.include_router(clinic_procedures_router)
+router.include_router(packages_router)
+router.include_router(protocols_router)
 router.include_router(conversations_router)
 router.include_router(crm_router)
 router.include_router(customers_router)

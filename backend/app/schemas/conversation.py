@@ -84,6 +84,9 @@ class CustomerDetailResponse(BaseModel):
     email: str | None
     tags: list[str] | None
     notes: str | None
+    medical_conditions: dict | None = None
+    allergies: dict | None = None
+    medications: dict | None = None
     total_bookings: int
     last_visit_at: datetime | None
     created_at: datetime
@@ -100,3 +103,6 @@ class CustomerUpdateRequest(BaseModel):
     email: str | None = None
     tags: list[str] | None = None
     notes: str | None = None
+    medical_conditions: dict | None = None
+    allergies: dict | None = None
+    medications: dict | None = None

@@ -50,6 +50,7 @@ class Procedure(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     pain_type: Mapped[str | None] = mapped_column(String(100))
     anesthesia_options: Mapped[str | None] = mapped_column(Text)
     anesthesia_details: Mapped[dict | None] = mapped_column(JSONB)
+    contraindications: Mapped[dict | None] = mapped_column(JSONB)
 
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 

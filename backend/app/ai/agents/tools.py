@@ -178,6 +178,133 @@ def create_consultation_tools(
             lines.append(f"이메일: {clinic.email}")
         return "\n".join(lines)
 
+    @tool
+    async def check_contraindications(procedure_name: str) -> str:
+        """Check if the customer has any health contraindications for a procedure.
+        Use when the customer asks about a procedure and you need to verify safety.
+        Args:
+            procedure_name: Name of the procedure to check
+        """
+        from app.models.clinic_procedure import ClinicProcedure
+        from app.models.procedure import Procedure
+        from app.services.contraindication_service import ContraindicationService
+
+        # Find the clinic procedure
+        result = await db.execute(
+            select(ClinicProcedure)
+            .join(Procedure)
+            .where(
+                ClinicProcedure.clinic_id == clinic_id,
+                ClinicProcedure.is_active.is_(True),
+                Procedure.name_ko.ilike(f"%{procedure_name}%"),
+            )
+            .limit(1)
+        )
+        cp = result.scalar_one_or_none()
+        if cp is None:
+            return f"'{procedure_name}' 시술을 찾을 수 없습니다."
+
+        svc = ContraindicationService(db)
+        check_result = await svc.check(customer_id, cp.id, clinic_id)
+
+        if not check_result.has_warnings:
+            return f"'{procedure_name}' 시술에 대한 금기사항이 없습니다."
+
+        lines = [f"⚠️ '{procedure_name}' 금기사항 체크 결과:"]
+        for w in check_result.warnings:
+            prefix = {"critical": "🔴", "warning": "🟡", "info": "🔵"}.get(
+                w.severity, "⚪"
+            )
+            lines.append(f"{prefix} [{w.category}] {w.detail}")
+        return "\n".join(lines)
+
+    @tool
+    async def get_protocol_checklist(procedure_name: str) -> str:
+        """Get the consultation protocol checklist for a procedure.
+        Returns unanswered checklist items that need to be completed.
+        Args:
+            procedure_name: Name of the procedure
+        """
+        from app.models.consultation_protocol import ConsultationProtocol
+        from app.models.procedure import Procedure
+
+        # Find procedure ID
+        proc_result = await db.execute(
+            select(Procedure).where(
+                Procedure.name_ko.ilike(f"%{procedure_name}%"),
+            ).limit(1)
+        )
+        procedure = proc_result.scalar_one_or_none()
+        if procedure is None:
+            return f"'{procedure_name}' 시술을 찾을 수 없습니다."
+
+        # Find protocol
+        proto_result = await db.execute(
+            select(ConsultationProtocol).where(
+                ConsultationProtocol.clinic_id == clinic_id,
+                ConsultationProtocol.is_active.is_(True),
+                (ConsultationProtocol.procedure_id == procedure.id)
+                | (ConsultationProtocol.procedure_id.is_(None)),
+            ).limit(1)
+        )
+        protocol = proto_result.scalar_one_or_none()
+        if protocol is None:
+            return f"'{procedure_name}'에 대한 상담 프로토콜이 없습니다."
+
+        checklist = protocol.checklist_items or []
+        if not checklist:
+            return "체크리스트 항목이 없습니다."
+
+        lines = [f"📋 '{procedure_name}' 상담 체크리스트:"]
+        for item in checklist:
+            required = "⚠️ 필수" if item.get("required") else ""
+            lines.append(f"- [{item['id']}] {item.get('question_ko', '')} {required}")
+        return "\n".join(lines)
+
+    @tool
+    async def update_protocol_item(procedure_name: str, item_id: str, answer: str) -> str:
+        """Update a protocol checklist item with the customer's answer.
+        Args:
+            procedure_name: Name of the procedure
+            item_id: ID of the checklist item (e.g., 'chk_1')
+            answer: Customer's answer
+        """
+        from app.models.booking import Booking as BookingModel
+
+        # Find booking with protocol_state for this conversation
+        booking_result = await db.execute(
+            select(BookingModel).where(
+                BookingModel.conversation_id == conversation_id,
+                BookingModel.clinic_id == clinic_id,
+                BookingModel.protocol_state.isnot(None),
+            ).limit(1)
+        )
+        booking = booking_result.scalar_one_or_none()
+        if booking is None:
+            return "프로토콜 상태가 초기화된 예약을 찾을 수 없습니다."
+
+        state = booking.protocol_state or {}
+        items = state.get("items", [])
+
+        updated = False
+        for item in items:
+            if item["id"] == item_id:
+                item["answered"] = True
+                item["answer"] = answer
+                updated = True
+                break
+
+        if not updated:
+            return f"체크리스트 항목 '{item_id}'을(를) 찾을 수 없습니다."
+
+        booking.protocol_state = state
+        from sqlalchemy.orm.attributes import flag_modified
+        flag_modified(booking, "protocol_state")
+        await db.flush()
+
+        completed = sum(1 for i in items if i.get("answered"))
+        return f"항목 '{item_id}' 완료. 진행률: {completed}/{len(items)}"
+
     return [
         search_procedures,
         create_booking,
@@ -185,4 +312,7 @@ def create_consultation_tools(
         check_availability,
         escalate_to_human,
         get_clinic_info,
+        check_contraindications,
+        get_protocol_checklist,
+        update_protocol_item,
     ]

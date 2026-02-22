@@ -13,6 +13,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
@@ -49,6 +50,11 @@ class Customer(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     # Tags / Notes
     tags: Mapped[list[str] | None] = mapped_column(ARRAY(Text), default=list)
     notes: Mapped[str | None] = mapped_column(Text)
+
+    # Health information
+    medical_conditions: Mapped[dict | None] = mapped_column(JSONB)
+    allergies: Mapped[dict | None] = mapped_column(JSONB)
+    medications: Mapped[dict | None] = mapped_column(JSONB)
 
     # Stats (cached)
     total_bookings: Mapped[int] = mapped_column(Integer, default=0)

@@ -14,7 +14,9 @@ from app.models.ab_test import ABTest, ABTestResult, ABTestVariant
 from app.models.booking import Booking
 from app.models.consultation_performance import ConsultationPerformance
 from app.models.conversation import Conversation
+from app.models.customer import Customer
 from app.models.message import Message
+from app.models.messenger_account import MessengerAccount
 from app.models.payment import Payment
 from app.models.user import User
 from app.schemas.analytics import (
@@ -366,3 +368,252 @@ async def get_ab_test_analytics(
         })
 
     return {"tests": items}
+
+
+@router.get("/conversion-funnel")
+async def get_conversion_funnel(
+    days: int = Query(default=30, ge=1, le=365),
+    group_by: str = Query(default="nationality", pattern="^(nationality|channel|both)$"),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Conversion funnel: conversations → bookings → payments, grouped by nationality/channel/both."""
+    clinic_id = current_user.clinic_id
+    cutoff = date.today() - timedelta(days=days)
+
+    if group_by == "nationality":
+        groups = await _funnel_by_nationality(db, clinic_id, cutoff)
+    elif group_by == "channel":
+        groups = await _funnel_by_channel(db, clinic_id, cutoff)
+    else:
+        groups = await _funnel_by_both(db, clinic_id, cutoff)
+
+    # Totals
+    total_conversations = sum(g["conversations"] for g in groups)
+    total_bookings = sum(g["bookings"] for g in groups)
+    total_payments = sum(g["payments"] for g in groups)
+
+    return {
+        "days": days,
+        "group_by": group_by,
+        "groups": groups,
+        "totals": {
+            "conversations": total_conversations,
+            "bookings": total_bookings,
+            "payments": total_payments,
+            "booking_rate": round(total_bookings / total_conversations * 100, 1) if total_conversations > 0 else 0,
+            "payment_rate": round(total_payments / total_bookings * 100, 1) if total_bookings > 0 else 0,
+        },
+    }
+
+
+async def _funnel_by_nationality(db: AsyncSession, clinic_id, cutoff):
+    # Conversations per country
+    conv_result = await db.execute(
+        select(
+            Customer.country_code,
+            func.count(func.distinct(Conversation.customer_id)).label("conversations"),
+        )
+        .join(Customer, Conversation.customer_id == Customer.id)
+        .where(
+            Conversation.clinic_id == clinic_id,
+            func.date(Conversation.created_at) >= cutoff,
+        )
+        .group_by(Customer.country_code)
+    )
+    conv_data = {row.country_code or "unknown": row.conversations for row in conv_result.all()}
+
+    # Bookings per country
+    booking_result = await db.execute(
+        select(
+            Customer.country_code,
+            func.count(func.distinct(Booking.customer_id)).label("bookings"),
+        )
+        .join(Customer, Booking.customer_id == Customer.id)
+        .where(
+            Booking.clinic_id == clinic_id,
+            func.date(Booking.created_at) >= cutoff,
+        )
+        .group_by(Customer.country_code)
+    )
+    booking_data = {row.country_code or "unknown": row.bookings for row in booking_result.all()}
+
+    # Payments per country
+    payment_result = await db.execute(
+        select(
+            Customer.country_code,
+            func.count(func.distinct(Payment.customer_id)).label("payments"),
+        )
+        .join(Customer, Payment.customer_id == Customer.id)
+        .where(
+            Payment.clinic_id == clinic_id,
+            Payment.status == "completed",
+            func.date(Payment.created_at) >= cutoff,
+        )
+        .group_by(Customer.country_code)
+    )
+    payment_data = {row.country_code or "unknown": row.payments for row in payment_result.all()}
+
+    all_dims = set(conv_data.keys()) | set(booking_data.keys())
+    groups = []
+    for dim in sorted(all_dims):
+        convs = conv_data.get(dim, 0)
+        bkgs = booking_data.get(dim, 0)
+        pmts = payment_data.get(dim, 0)
+        groups.append({
+            "dimension": dim,
+            "conversations": convs,
+            "bookings": bkgs,
+            "payments": pmts,
+            "booking_rate": round(bkgs / convs * 100, 1) if convs > 0 else 0,
+            "payment_rate": round(pmts / bkgs * 100, 1) if bkgs > 0 else 0,
+        })
+    return groups
+
+
+async def _funnel_by_channel(db: AsyncSession, clinic_id, cutoff):
+    conv_result = await db.execute(
+        select(
+            MessengerAccount.messenger_type,
+            func.count(func.distinct(Conversation.customer_id)).label("conversations"),
+        )
+        .join(MessengerAccount, Conversation.messenger_account_id == MessengerAccount.id)
+        .where(
+            Conversation.clinic_id == clinic_id,
+            func.date(Conversation.created_at) >= cutoff,
+        )
+        .group_by(MessengerAccount.messenger_type)
+    )
+    conv_data = {row.messenger_type: row.conversations for row in conv_result.all()}
+
+    # For bookings/payments by channel, join through conversation
+    booking_result = await db.execute(
+        select(
+            MessengerAccount.messenger_type,
+            func.count(func.distinct(Booking.customer_id)).label("bookings"),
+        )
+        .select_from(Booking)
+        .join(Conversation, Booking.conversation_id == Conversation.id)
+        .join(MessengerAccount, Conversation.messenger_account_id == MessengerAccount.id)
+        .where(
+            Booking.clinic_id == clinic_id,
+            func.date(Booking.created_at) >= cutoff,
+        )
+        .group_by(MessengerAccount.messenger_type)
+    )
+    booking_data = {row.messenger_type: row.bookings for row in booking_result.all()}
+
+    payment_result = await db.execute(
+        select(
+            MessengerAccount.messenger_type,
+            func.count(func.distinct(Payment.customer_id)).label("payments"),
+        )
+        .select_from(Payment)
+        .join(Booking, Payment.booking_id == Booking.id)
+        .join(Conversation, Booking.conversation_id == Conversation.id)
+        .join(MessengerAccount, Conversation.messenger_account_id == MessengerAccount.id)
+        .where(
+            Payment.clinic_id == clinic_id,
+            Payment.status == "completed",
+            func.date(Payment.created_at) >= cutoff,
+        )
+        .group_by(MessengerAccount.messenger_type)
+    )
+    payment_data = {row.messenger_type: row.payments for row in payment_result.all()}
+
+    all_dims = set(conv_data.keys()) | set(booking_data.keys())
+    groups = []
+    for dim in sorted(all_dims):
+        convs = conv_data.get(dim, 0)
+        bkgs = booking_data.get(dim, 0)
+        pmts = payment_data.get(dim, 0)
+        groups.append({
+            "dimension": dim,
+            "conversations": convs,
+            "bookings": bkgs,
+            "payments": pmts,
+            "booking_rate": round(bkgs / convs * 100, 1) if convs > 0 else 0,
+            "payment_rate": round(pmts / bkgs * 100, 1) if bkgs > 0 else 0,
+        })
+    return groups
+
+
+async def _funnel_by_both(db: AsyncSession, clinic_id, cutoff):
+    conv_result = await db.execute(
+        select(
+            Customer.country_code,
+            MessengerAccount.messenger_type,
+            func.count(func.distinct(Conversation.customer_id)).label("conversations"),
+        )
+        .join(Customer, Conversation.customer_id == Customer.id)
+        .join(MessengerAccount, Conversation.messenger_account_id == MessengerAccount.id)
+        .where(
+            Conversation.clinic_id == clinic_id,
+            func.date(Conversation.created_at) >= cutoff,
+        )
+        .group_by(Customer.country_code, MessengerAccount.messenger_type)
+    )
+    conv_data = {}
+    for row in conv_result.all():
+        key = f"{row.country_code or 'unknown'}|{row.messenger_type}"
+        conv_data[key] = row.conversations
+
+    booking_result = await db.execute(
+        select(
+            Customer.country_code,
+            MessengerAccount.messenger_type,
+            func.count(func.distinct(Booking.customer_id)).label("bookings"),
+        )
+        .select_from(Booking)
+        .join(Customer, Booking.customer_id == Customer.id)
+        .join(Conversation, Booking.conversation_id == Conversation.id)
+        .join(MessengerAccount, Conversation.messenger_account_id == MessengerAccount.id)
+        .where(
+            Booking.clinic_id == clinic_id,
+            func.date(Booking.created_at) >= cutoff,
+        )
+        .group_by(Customer.country_code, MessengerAccount.messenger_type)
+    )
+    booking_data = {}
+    for row in booking_result.all():
+        key = f"{row.country_code or 'unknown'}|{row.messenger_type}"
+        booking_data[key] = row.bookings
+
+    payment_result = await db.execute(
+        select(
+            Customer.country_code,
+            MessengerAccount.messenger_type,
+            func.count(func.distinct(Payment.customer_id)).label("payments"),
+        )
+        .select_from(Payment)
+        .join(Booking, Payment.booking_id == Booking.id)
+        .join(Customer, Payment.customer_id == Customer.id)
+        .join(Conversation, Booking.conversation_id == Conversation.id)
+        .join(MessengerAccount, Conversation.messenger_account_id == MessengerAccount.id)
+        .where(
+            Payment.clinic_id == clinic_id,
+            Payment.status == "completed",
+            func.date(Payment.created_at) >= cutoff,
+        )
+        .group_by(Customer.country_code, MessengerAccount.messenger_type)
+    )
+    payment_data = {}
+    for row in payment_result.all():
+        key = f"{row.country_code or 'unknown'}|{row.messenger_type}"
+        payment_data[key] = row.payments
+
+    all_dims = set(conv_data.keys()) | set(booking_data.keys())
+    groups = []
+    for dim in sorted(all_dims):
+        convs = conv_data.get(dim, 0)
+        bkgs = booking_data.get(dim, 0)
+        pmts = payment_data.get(dim, 0)
+        groups.append({
+            "dimension": dim,
+            "conversations": convs,
+            "bookings": bkgs,
+            "payments": pmts,
+            "booking_rate": round(bkgs / convs * 100, 1) if convs > 0 else 0,
+            "payment_rate": round(pmts / bkgs * 100, 1) if bkgs > 0 else 0,
+        })
+    return groups

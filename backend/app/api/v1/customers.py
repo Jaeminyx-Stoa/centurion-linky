@@ -14,8 +14,10 @@ from app.models.customer import Customer
 from app.models.message import Message
 from app.models.payment import Payment
 from app.models.user import User
+from app.schemas.contraindication import ContraindicationCheckResponse
 from app.schemas.conversation import CustomerDetailResponse, CustomerUpdateRequest
 from app.schemas.pagination import PaginatedResponse, PaginationParams
+from app.services.contraindication_service import ContraindicationService
 
 router = APIRouter(prefix="/customers", tags=["customers"])
 
@@ -71,6 +73,21 @@ async def update_customer(
         setattr(customer, field, value)
     await db.flush()
     return customer
+
+
+@router.get(
+    "/{customer_id}/contraindication-check",
+    response_model=ContraindicationCheckResponse,
+)
+async def check_contraindications(
+    customer_id: uuid.UUID,
+    procedure_id: uuid.UUID = Query(..., description="Clinic procedure ID"),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await _get_customer(db, customer_id, current_user.clinic_id)
+    svc = ContraindicationService(db)
+    return await svc.check(customer_id, procedure_id, current_user.clinic_id)
 
 
 @router.get("/{customer_id}/history")

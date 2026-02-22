@@ -9,6 +9,8 @@ import {
   Globe,
   Tag,
   Save,
+  Plus,
+  Trash2,
 } from "lucide-react";
 
 import { useAuthStore } from "@/stores/auth";
@@ -24,7 +26,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ListSkeleton } from "@/components/shared/skeletons";
 import { PaginationControls } from "@/components/shared/pagination-controls";
-import type { Customer } from "@/types/customer";
+import type { Customer, HealthData, HealthItem } from "@/types/customer";
+import { useT } from "@/i18n";
 
 const MESSENGER_FILTERS = [
   { id: "all", label: "전체" },
@@ -36,6 +39,61 @@ const MESSENGER_FILTERS = [
   { id: "kakao", label: "KakaoTalk" },
 ];
 
+function HealthItemList({
+  label,
+  items,
+  onChange,
+  addLabel,
+}: {
+  label: string;
+  items: HealthItem[];
+  onChange: (items: HealthItem[]) => void;
+  addLabel: string;
+}) {
+  const [newName, setNewName] = useState("");
+
+  const handleAdd = () => {
+    if (!newName.trim()) return;
+    onChange([...items, { name: newName.trim() }]);
+    setNewName("");
+  };
+
+  const handleRemove = (idx: number) => {
+    onChange(items.filter((_, i) => i !== idx));
+  };
+
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-xs">{label}</Label>
+      {items.map((item, idx) => (
+        <div key={idx} className="flex items-center gap-1">
+          <span className="flex-1 rounded border px-2 py-1 text-xs">
+            {item.name}
+          </span>
+          <button
+            onClick={() => handleRemove(idx)}
+            className="rounded p-0.5 text-muted-foreground hover:text-destructive"
+          >
+            <Trash2 className="h-3 w-3" />
+          </button>
+        </div>
+      ))}
+      <div className="flex gap-1">
+        <Input
+          value={newName}
+          onChange={(e) => setNewName(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+          className="h-7 text-xs"
+          placeholder={addLabel}
+        />
+        <Button variant="outline" size="sm" className="h-7 px-2" onClick={handleAdd}>
+          <Plus className="h-3 w-3" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function CustomerDetail({
   customer,
   onClose,
@@ -45,10 +103,20 @@ function CustomerDetail({
 }) {
   const { accessToken } = useAuthStore();
   const { updateCustomer } = useCustomerStore();
+  const t = useT();
   const [name, setName] = useState(customer.name || "");
   const [phone, setPhone] = useState(customer.phone || "");
   const [email, setEmail] = useState(customer.email || "");
   const [notes, setNotes] = useState(customer.notes || "");
+  const [conditions, setConditions] = useState<HealthItem[]>(
+    customer.medical_conditions?.items || [],
+  );
+  const [allergies, setAllergies] = useState<HealthItem[]>(
+    customer.allergies?.items || [],
+  );
+  const [medications, setMedications] = useState<HealthItem[]>(
+    customer.medications?.items || [],
+  );
 
   const handleSave = async () => {
     if (!accessToken) return;
@@ -57,6 +125,9 @@ function CustomerDetail({
       phone: phone || undefined,
       email: email || undefined,
       notes: notes || undefined,
+      medical_conditions: { items: conditions },
+      allergies: { items: allergies },
+      medications: { items: medications },
     });
   };
 
@@ -110,6 +181,33 @@ function CustomerDetail({
             </div>
           )}
         </div>
+
+        {/* Health Info */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">{t("customers.healthInfo")}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <HealthItemList
+              label={t("customers.medicalConditions")}
+              items={conditions}
+              onChange={setConditions}
+              addLabel={t("customers.addItem")}
+            />
+            <HealthItemList
+              label={t("customers.allergies")}
+              items={allergies}
+              onChange={setAllergies}
+              addLabel={t("customers.addItem")}
+            />
+            <HealthItemList
+              label={t("customers.medications")}
+              items={medications}
+              onChange={setMedications}
+              addLabel={t("customers.addItem")}
+            />
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>

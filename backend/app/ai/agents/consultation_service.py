@@ -49,6 +49,7 @@ class ConsultationService:
         persona: dict,
         conversation_history: str,
         sales_context: dict,
+        protocol_context: str | None = None,
     ) -> ConsultationResult:
         # Step 1: Check escalation
         escalation_level = await self.escalation_detector.detect(
@@ -93,6 +94,8 @@ class ConsultationService:
                 )
 
         # Step 4: Fallback to 3-layer response chain
+        if protocol_context:
+            rag_results = f"{rag_results}\n\n[상담 프로토콜]\n{protocol_context}"
         response = await self.response_chain.ainvoke(
             query=query,
             rag_results=rag_results,

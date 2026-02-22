@@ -6,16 +6,20 @@ from app.models.booking import Booking
 from app.models.clinic import Clinic
 from app.models.clinic_procedure import ClinicProcedure
 from app.models.consultation_performance import ConsultationPerformance
+from app.models.consultation_protocol import ConsultationProtocol
 from app.models.conversation import Conversation
 from app.models.crm_event import CRMEvent
 from app.models.cultural_profile import CulturalProfile
 from app.models.customer import Customer
 from app.models.llm_usage import LLMUsage
 from app.models.medical_term import MedicalTerm
+from app.models.package_enrollment import PackageEnrollment
+from app.models.package_session import PackageSession
 from app.models.message import Message
 from app.models.messenger_account import MessengerAccount
 from app.models.payment import Payment
 from app.models.procedure import Procedure
+from app.models.procedure_package import ProcedurePackage
 from app.models.procedure_category import ProcedureCategory
 from app.models.procedure_pricing import ProcedurePricing
 from app.models.response_library import ResponseLibrary
@@ -36,16 +40,20 @@ __all__ = [
     "Clinic",
     "ClinicProcedure",
     "ConsultationPerformance",
+    "ConsultationProtocol",
     "Conversation",
     "CRMEvent",
     "CulturalProfile",
     "Customer",
     "LLMUsage",
     "MedicalTerm",
+    "PackageEnrollment",
+    "PackageSession",
     "Message",
     "MessengerAccount",
     "Payment",
     "Procedure",
+    "ProcedurePackage",
     "ProcedureCategory",
     "ProcedurePricing",
     "ResponseLibrary",

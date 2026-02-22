@@ -13,10 +13,13 @@ import {
   Target,
   Heart,
   Activity,
+  Filter,
 } from "lucide-react";
 
 import { useAuthStore } from "@/stores/auth";
 import { useAnalyticsStore } from "@/stores/analytics";
+import { useT } from "@/i18n";
+import { api } from "@/lib/api";
 import {
   Card,
   CardContent,
@@ -24,13 +27,14 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-type TabId = "overview" | "performance" | "satisfaction" | "crm";
+type TabId = "overview" | "performance" | "satisfaction" | "crm" | "funnel";
 
 const TABS: { id: TabId; label: string; icon: React.ElementType }[] = [
   { id: "overview", label: "Overview", icon: BarChart3 },
   { id: "performance", label: "상담 성과", icon: Target },
   { id: "satisfaction", label: "만족도", icon: Heart },
   { id: "crm", label: "CRM 통계", icon: Activity },
+  { id: "funnel", label: "전환 분석", icon: Filter },
 ];
 
 function StatCard({
@@ -618,6 +622,211 @@ function CRMStatsTab() {
   );
 }
 
+interface FunnelGroup {
+  dimension: string;
+  conversations: number;
+  bookings: number;
+  payments: number;
+  booking_rate: number;
+  payment_rate: number;
+}
+
+interface FunnelData {
+  days: number;
+  group_by: string;
+  groups: FunnelGroup[];
+  totals: {
+    conversations: number;
+    bookings: number;
+    payments: number;
+    booking_rate: number;
+    payment_rate: number;
+  };
+}
+
+function rateColor(rate: number) {
+  if (rate >= 30) return "text-green-600";
+  if (rate >= 15) return "text-yellow-600";
+  return "text-red-600";
+}
+
+function FunnelTab() {
+  const { accessToken } = useAuthStore();
+  const t = useT();
+  const [days, setDays] = useState(30);
+  const [groupBy, setGroupBy] = useState<"nationality" | "channel" | "both">(
+    "nationality",
+  );
+  const [data, setData] = useState<FunnelData | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!accessToken) return;
+    setLoading(true);
+    api
+      .get<FunnelData>(
+        `/api/v1/analytics/conversion-funnel?days=${days}&group_by=${groupBy}`,
+        { token: accessToken },
+      )
+      .then(setData)
+      .catch(() => setData(null))
+      .finally(() => setLoading(false));
+  }, [accessToken, days, groupBy]);
+
+  const DAY_OPTIONS = [7, 14, 30, 60, 90];
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">
+            {t("analytics.funnel.groupBy")}:
+          </span>
+          <div className="flex rounded-lg border">
+            {(["nationality", "channel", "both"] as const).map((g) => (
+              <button
+                key={g}
+                onClick={() => setGroupBy(g)}
+                className={`px-3 py-1 text-xs transition-colors ${
+                  groupBy === g
+                    ? "bg-primary text-primary-foreground"
+                    : "hover:bg-muted"
+                }`}
+              >
+                {t(`analytics.funnel.${g}`)}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <select
+            value={days}
+            onChange={(e) => setDays(Number(e.target.value))}
+            className="rounded border px-3 py-1.5 text-sm"
+          >
+            {DAY_OPTIONS.map((d) => (
+              <option key={d} value={d}>
+                {d}{t("analytics.funnel.days")}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {loading ? (
+        <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
+      ) : !data || data.groups.length === 0 ? (
+        <p className="text-sm text-muted-foreground">{t("common.noData")}</p>
+      ) : (
+        <>
+          {/* Totals */}
+          <div className="grid grid-cols-5 gap-4">
+            <StatCard
+              label={t("analytics.funnel.conversations")}
+              value={data.totals.conversations}
+              icon={BarChart3}
+            />
+            <StatCard
+              label={t("analytics.funnel.bookings")}
+              value={data.totals.bookings}
+              icon={CheckCircle}
+              color="text-blue-500"
+            />
+            <StatCard
+              label={t("analytics.funnel.payments")}
+              value={data.totals.payments}
+              icon={Target}
+              color="text-green-500"
+            />
+            <StatCard
+              label={t("analytics.funnel.bookingRate")}
+              value={`${data.totals.booking_rate}%`}
+              icon={TrendingUp}
+              color="text-purple-500"
+            />
+            <StatCard
+              label={t("analytics.funnel.paymentRate")}
+              value={`${data.totals.payment_rate}%`}
+              icon={Activity}
+              color="text-orange-500"
+            />
+          </div>
+
+          {/* Detail Table */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">
+                {t("analytics.funnel.title")}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/50">
+                    <th className="px-4 py-2 text-left font-medium">
+                      {groupBy === "nationality"
+                        ? t("analytics.funnel.nationality")
+                        : groupBy === "channel"
+                          ? t("analytics.funnel.channel")
+                          : t("analytics.funnel.both")}
+                    </th>
+                    <th className="px-4 py-2 text-right font-medium">
+                      {t("analytics.funnel.conversations")}
+                    </th>
+                    <th className="px-4 py-2 text-right font-medium">
+                      {t("analytics.funnel.bookings")}
+                    </th>
+                    <th className="px-4 py-2 text-right font-medium">
+                      {t("analytics.funnel.payments")}
+                    </th>
+                    <th className="px-4 py-2 text-right font-medium">
+                      {t("analytics.funnel.bookingRate")}
+                    </th>
+                    <th className="px-4 py-2 text-right font-medium">
+                      {t("analytics.funnel.paymentRate")}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.groups.map((group) => (
+                    <tr
+                      key={group.dimension}
+                      className="border-b last:border-b-0 hover:bg-muted/50"
+                    >
+                      <td className="px-4 py-2 font-medium">
+                        {group.dimension}
+                      </td>
+                      <td className="px-4 py-2 text-right">
+                        {group.conversations}
+                      </td>
+                      <td className="px-4 py-2 text-right">
+                        {group.bookings}
+                      </td>
+                      <td className="px-4 py-2 text-right">
+                        {group.payments}
+                      </td>
+                      <td
+                        className={`px-4 py-2 text-right font-medium ${rateColor(group.booking_rate)}`}
+                      >
+                        {group.booking_rate}%
+                      </td>
+                      <td
+                        className={`px-4 py-2 text-right font-medium ${rateColor(group.payment_rate)}`}
+                      >
+                        {group.payment_rate}%
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </CardContent>
+          </Card>
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function AnalyticsPage() {
   const { accessToken } = useAuthStore();
   const { isLoading, error, fetchAll } = useAnalyticsStore();
@@ -697,6 +906,7 @@ export default function AnalyticsPage() {
         {activeTab === "performance" && <PerformanceTab />}
         {activeTab === "satisfaction" && <SatisfactionTab />}
         {activeTab === "crm" && <CRMStatsTab />}
+        {activeTab === "funnel" && <FunnelTab />}
       </div>
     </div>
   );

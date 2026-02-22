@@ -3,6 +3,7 @@ from datetime import date, time
 from decimal import Decimal
 
 from sqlalchemy import Date, ForeignKey, Numeric, String, Text, Time
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
@@ -41,6 +42,9 @@ class Booking(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     # Notes
     notes: Mapped[str | None] = mapped_column(Text)
     cancellation_reason: Mapped[str | None] = mapped_column(Text)
+
+    # Consultation protocol state
+    protocol_state: Mapped[dict | None] = mapped_column(JSONB)
 
     # Relationships
     clinic: Mapped["Clinic"] = relationship()  # noqa: F821
