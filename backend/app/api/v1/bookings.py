@@ -139,6 +139,15 @@ async def cancel_booking(
 
     await db.flush()
     await db.refresh(booking)
+
+    from app.websocket.manager import manager as ws_manager
+
+    await ws_manager.broadcast_to_clinic(current_user.clinic_id, {
+        "type": "booking_updated",
+        "booking_id": str(booking.id),
+        "status": booking.status,
+    })
+
     return booking
 
 
@@ -156,4 +165,13 @@ async def complete_booking(
     booking.status = "completed"
     await db.flush()
     await db.refresh(booking)
+
+    from app.websocket.manager import manager as ws_manager
+
+    await ws_manager.broadcast_to_clinic(current_user.clinic_id, {
+        "type": "booking_updated",
+        "booking_id": str(booking.id),
+        "status": booking.status,
+    })
+
     return booking

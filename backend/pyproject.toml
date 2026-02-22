@@ -44,6 +44,12 @@ dependencies = [
     "langsmith>=0.2.0",
     # Azure
     "azure-storage-blob>=12.0.0",
+    # Resilience
+    "tenacity>=9.0.0",
+    # Payments
+    "stripe>=8.0.0",
+    # PDF generation
+    "reportlab>=4.0.0",
 ]
 
 [build-system]

@@ -176,11 +176,56 @@ const en: Record<TranslationKey, string> = {
   "error.title": "Something went wrong",
   "error.retry": "Try again",
 
+  // Theme
+  "theme.light": "Light mode",
+  "theme.dark": "Dark mode",
+  "theme.system": "System default",
+
   // Satisfaction labels (accessibility)
   "satisfaction.green": "Very satisfied",
   "satisfaction.yellow": "Satisfied",
   "satisfaction.orange": "Neutral",
   "satisfaction.red": "Dissatisfied",
+
+  // Command palette
+  "command.title": "Command",
+  "command.placeholder": "Search pages...",
+  "command.navigation": "Navigation",
+  "command.actions": "Quick Actions",
+  "command.noResults": "No results",
+
+  // Notifications
+  "notification.escalation": "Escalation alert",
+  "notification.satisfactionWarning": "Satisfaction warning",
+  "notification.deliveryFailed": "Message delivery failed",
+  "notification.quotaWarning": "LLM cost warning",
+  "notification.quotaExceeded": "LLM cost limit exceeded",
+  "notification.markAllRead": "Mark all read",
+  "notification.empty": "No notifications",
+
+  // AI Feedback
+  "feedback.helpful": "Helpful",
+  "feedback.notHelpful": "Not helpful",
+  "feedback.thanks": "Thanks for the feedback",
+
+  // LLM Usage
+  "llmUsage.title": "LLM Costs",
+  "llmUsage.tab.summary": "Monthly Summary",
+  "llmUsage.tab.daily": "Daily Trend",
+  "llmUsage.tab.quota": "Budget",
+  "llmUsage.totalCost": "Total Cost",
+  "llmUsage.totalTokens": "Total Tokens",
+  "llmUsage.operation": "Operation",
+  "llmUsage.count": "Calls",
+  "llmUsage.inputTokens": "Input Tokens",
+  "llmUsage.outputTokens": "Output Tokens",
+  "llmUsage.cost": "Cost (USD)",
+  "llmUsage.date": "Date",
+  "llmUsage.quota": "Monthly Budget",
+  "llmUsage.currentUsage": "Current Usage",
+  "llmUsage.usagePercent": "Usage %",
+  "llmUsage.setQuota": "Set Budget",
+  "llmUsage.noQuota": "No budget set",
 };
 
 export default en;

@@ -1,9 +1,10 @@
 """Knowledge Assembly Service — assembles RAG-like context from DB tables.
 
-Searches response_library, procedures, and medical_terms using keyword matching
-to build context for the AI consultation pipeline.
+Uses hybrid search: vector similarity first, keyword fallback when embeddings
+are unavailable or return insufficient results.
 """
 
+import logging
 import uuid
 
 from sqlalchemy import or_, select
@@ -11,18 +12,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from app.core.query_utils import escape_like
-
 from app.models.clinic_procedure import ClinicProcedure
 from app.models.medical_term import MedicalTerm
 from app.models.procedure import Procedure
 from app.models.response_library import ResponseLibrary
 
+logger = logging.getLogger(__name__)
+
 
 class KnowledgeService:
     """Assembles knowledge context from response_library, procedures, and medical_terms."""
 
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: AsyncSession, vector_retriever=None):
         self.db = db
+        self._retriever = vector_retriever
 
     async def assemble_knowledge(self, clinic_id: uuid.UUID, query: str) -> dict:
         """Build knowledge context for an AI consultation query.
@@ -39,6 +42,34 @@ class KnowledgeService:
         }
 
     async def _search_response_library(
+        self, clinic_id: uuid.UUID, query: str
+    ) -> list[ResponseLibrary]:
+        """Hybrid search: vector first, keyword fallback."""
+        vector_results = []
+        if self._retriever:
+            try:
+                vector_results = await self._retriever.search_response_library(
+                    clinic_id, query, limit=5
+                )
+            except Exception:
+                logger.exception("Vector search failed for response_library")
+
+        if len(vector_results) >= 3:
+            return vector_results
+
+        # Keyword fallback / supplement
+        keyword_results = await self._keyword_search_response_library(clinic_id, query)
+
+        # Merge: vector results first, then keyword results (deduplicated)
+        seen_ids = {r.id for r in vector_results}
+        merged = list(vector_results)
+        for r in keyword_results:
+            if r.id not in seen_ids:
+                merged.append(r)
+                seen_ids.add(r.id)
+        return merged[:5]
+
+    async def _keyword_search_response_library(
         self, clinic_id: uuid.UUID, query: str
     ) -> list[ResponseLibrary]:
         """Search FAQ entries by keyword matching."""
@@ -66,6 +97,49 @@ class KnowledgeService:
         return list(result.scalars().all())
 
     async def _search_procedures(
+        self, clinic_id: uuid.UUID, query: str
+    ) -> list[dict]:
+        """Hybrid search for procedures linked to the clinic."""
+        vector_procs = []
+        if self._retriever:
+            try:
+                vector_procs = await self._retriever.search_procedures(
+                    clinic_id, query, limit=5
+                )
+            except Exception:
+                logger.exception("Vector search failed for procedures")
+
+        # If we have vector results, format them directly
+        if vector_procs:
+            results = []
+            for proc in vector_procs:
+                results.append({
+                    "name": proc.name_ko,
+                    "name_en": proc.name_en,
+                    "description": proc.description_ko or "",
+                    "effects": proc.effects_ko or "",
+                    "duration_minutes": proc.duration_minutes,
+                    "downtime_days": proc.downtime_days,
+                    "precautions_after": proc.precautions_after or "",
+                })
+            if len(results) >= 3:
+                return results
+
+        # Keyword fallback
+        keyword_results = await self._keyword_search_procedures(clinic_id, query)
+
+        if not vector_procs:
+            return keyword_results
+
+        # Merge
+        seen_names = {r["name"] for r in results}
+        for r in keyword_results:
+            if r["name"] not in seen_names:
+                results.append(r)
+                seen_names.add(r["name"])
+        return results[:5]
+
+    async def _keyword_search_procedures(
         self, clinic_id: uuid.UUID, query: str
     ) -> list[dict]:
         """Search procedures linked to the clinic by keyword matching."""
@@ -113,6 +187,34 @@ class KnowledgeService:
         return results
 
     async def _search_medical_terms(
+        self, clinic_id: uuid.UUID, query: str
+    ) -> list[MedicalTerm]:
+        """Hybrid search for medical terms."""
+        vector_results = []
+        if self._retriever:
+            try:
+                vector_results = await self._retriever.search_medical_terms(
+                    clinic_id, query, limit=10
+                )
+            except Exception:
+                logger.exception("Vector search failed for medical_terms")
+
+        if len(vector_results) >= 5:
+            return vector_results
+
+        # Keyword fallback
+        keyword_results = await self._keyword_search_medical_terms(clinic_id, query)
+
+        # Merge
+        seen_ids = {r.id for r in vector_results}
+        merged = list(vector_results)
+        for r in keyword_results:
+            if r.id not in seen_ids:
+                merged.append(r)
+                seen_ids.add(r.id)
+        return merged[:10]
+
+    async def _keyword_search_medical_terms(
         self, clinic_id: uuid.UUID, query: str
     ) -> list[MedicalTerm]:
         """Search medical terms by keyword matching."""

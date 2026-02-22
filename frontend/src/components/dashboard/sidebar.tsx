@@ -12,6 +12,7 @@ import {
   BarChart3,
   BookOpen,
   FlaskConical,
+  DollarSign,
   Settings,
   LogOut,
   Menu,
@@ -22,6 +23,8 @@ import { useAuthStore } from "@/stores/auth";
 import { useUIStore } from "@/stores/ui";
 import { useT, type TranslationKey } from "@/i18n";
 import { LanguageSwitcher } from "@/components/shared/language-switcher";
+import { NotificationBell } from "@/components/dashboard/notification-bell";
+import { ThemeToggle } from "@/components/shared/theme-toggle";
 import {
   Sheet,
   SheetContent,
@@ -40,6 +43,7 @@ const NAV_ITEMS: { icon: React.ElementType; labelKey: TranslationKey; href: stri
   { icon: BarChart3, labelKey: "nav.analytics", href: "/analytics" },
   { icon: BookOpen, labelKey: "nav.knowledge", href: "/knowledge" },
   { icon: FlaskConical, labelKey: "nav.aiLab", href: "/ai-lab" },
+  { icon: DollarSign, labelKey: "llmUsage.title", href: "/llm-usage" },
   { icon: Settings, labelKey: "nav.settings", href: "/settings" },
 ];
 
@@ -97,7 +101,9 @@ export function Sidebar() {
       <nav className="flex flex-1 flex-col items-center gap-2" aria-label={t("nav.mainNav")}>
         <NavItems expanded={false} />
       </nav>
-      <div className="mb-2">
+      <div className="mb-2 flex flex-col items-center gap-2">
+        <NotificationBell />
+        <ThemeToggle />
         <LanguageSwitcher />
       </div>
       <button
@@ -137,7 +143,11 @@ export function MobileHeader() {
           <Menu className="h-5 w-5" />
         </button>
         <span className="text-sm font-bold text-primary">Linky</span>
-        <LanguageSwitcher />
+        <div className="flex items-center gap-2">
+          <NotificationBell />
+          <ThemeToggle />
+          <LanguageSwitcher />
+        </div>
       </div>
 
       {/* Mobile drawer */}

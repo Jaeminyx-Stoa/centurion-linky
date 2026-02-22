@@ -2,9 +2,11 @@
 
 Coordinates: translation, knowledge assembly, cultural profiling, consultation,
 humanlike behaviors, messenger delivery, and satisfaction tracking.
+Also provides suggestion generation for manual (human) mode.
 """
 
 import asyncio
+import json
 import logging
 import uuid
 
@@ -13,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.ab_test_engine import ABTestEngine
 from app.ai.agents.consultation_service import ConsultationService
+from app.ai.usage_tracker import UsageTracker
 from app.ai.humanlike.delay import HumanLikeDelay
 from app.ai.humanlike.disclosure import get_ai_disclosure
 from app.ai.humanlike.greeting import get_time_greeting
@@ -27,6 +30,21 @@ from app.models.message import Message
 from app.models.messenger_account import MessengerAccount
 from app.services.knowledge_service import KnowledgeService
 from app.websocket.manager import manager
+
+SUGGESTION_PROMPT = """You are a helpful medical consultation AI assistant.
+Based on the conversation history and knowledge context, generate exactly 3 response options \
+with different tones for the human staff to choose from.
+
+Knowledge context:
+{rag_results}
+
+Conversation history:
+{conversation_history}
+
+Generate 3 responses as a JSON array. Each item should have "text" and "tone" fields.
+Tones should be: "friendly", "professional", "detailed".
+Respond ONLY with the JSON array, no other text.
+"""
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +71,9 @@ class AIResponseService:
 
         Returns the saved AI Message, or None if skipped.
         """
+        # 0. Usage tracker
+        tracker: UsageTracker | None = None
+
         # 1. Load context
         conversation = await self._load_conversation(conversation_id)
         if conversation is None:
@@ -74,6 +95,10 @@ class AIResponseService:
         if not customer or not messenger_account or not incoming_message:
             logger.warning("Missing data for AI response generation")
             return None
+
+        tracker = UsageTracker(
+            self.db, conversation.clinic_id, conversation_id, message_id
+        )
 
         language_code = customer.language_code or "ko"
         country_code = customer.country_code or "KR"
@@ -198,6 +223,16 @@ class AIResponseService:
             ai_message.messenger_message_id = msg_id
         except Exception:
             logger.exception("Failed to send message via messenger")
+            # Queue for retry delivery
+            from app.tasks.message_delivery import retry_message_delivery
+
+            retry_message_delivery.delay(
+                str(ai_message.id),
+                str(messenger_account.id),
+                customer.messenger_user_id,
+                response_text,
+                messenger_account.messenger_type,
+            )
 
         # 15. WebSocket broadcast
         await manager.broadcast_to_clinic(
@@ -219,9 +254,15 @@ class AIResponseService:
 
         # 16. Satisfaction analysis
         try:
-            await self._update_satisfaction(conversation)
+            await self._update_satisfaction(conversation, tracker=tracker)
         except Exception:
             logger.exception("Satisfaction analysis failed")
+
+        # 16.5. Auto-summarize long conversations
+        try:
+            await self._auto_summarize(conversation, tracker=tracker)
+        except Exception:
+            logger.exception("Auto-summarization failed")
 
         # 17. A/B test outcome recording
         if ab_variant:
@@ -230,7 +271,54 @@ class AIResponseService:
             except Exception:
                 logger.exception("A/B test outcome recording failed")
 
+        # 18. Flush LLM usage records
+        if tracker:
+            try:
+                await tracker.flush()
+            except Exception:
+                logger.exception("LLM usage flush failed")
+
         return ai_message
+
+    async def generate_suggestions(self, conversation_id: uuid.UUID) -> list[dict]:
+        """Generate 3 candidate responses for manual mode."""
+        conversation = await self._load_conversation(conversation_id)
+        if conversation is None:
+            return []
+
+        if conversation.ai_mode:
+            return []  # Suggestions are only for manual mode
+
+        # Assemble context
+        knowledge_svc = KnowledgeService(self.db)
+        knowledge = await knowledge_svc.assemble_knowledge(
+            conversation.clinic_id, ""
+        )
+        conversation_history = await self._load_conversation_history(conversation_id)
+
+        prompt = SUGGESTION_PROMPT.format(
+            rag_results=knowledge["rag_results"],
+            conversation_history=conversation_history,
+        )
+
+        try:
+            from app.ai.llm_router import get_light_llm
+
+            llm = get_light_llm()
+            response = await llm.ainvoke(prompt)
+            content = response.content if hasattr(response, "content") else str(response)
+
+            # Parse JSON array from response
+            suggestions = json.loads(content)
+            if isinstance(suggestions, list):
+                return [
+                    {"text": s.get("text", ""), "tone": s.get("tone", "neutral")}
+                    for s in suggestions[:3]
+                ]
+        except Exception:
+            logger.exception("Suggestion generation failed")
+
+        return []
 
     # --- Private helpers ---
 
@@ -303,6 +391,12 @@ class AIResponseService:
         }
 
     async def _load_conversation_history(self, conversation_id: uuid.UUID) -> str:
+        # Load conversation summary if available
+        conv_result = await self.db.execute(
+            select(Conversation.summary).where(Conversation.id == conversation_id)
+        )
+        summary = conv_result.scalar_one_or_none()
+
         result = await self.db.execute(
             select(Message)
             .where(Message.conversation_id == conversation_id)
@@ -319,7 +413,12 @@ class AIResponseService:
                 m.sender_type, m.sender_type
             )
             lines.append(f"{role}: {m.content}")
-        return "\n".join(lines)
+        history = "\n".join(lines)
+
+        # Prepend summary if available
+        if summary:
+            history = f"[이전 대화 요약]\n{summary}\n\n{history}"
+        return history
 
     async def _is_first_ai_message(self, conversation_id: uuid.UUID) -> bool:
         result = await self.db.execute(
@@ -388,7 +487,46 @@ class AIResponseService:
             outcome_data={"satisfaction_score": conversation.satisfaction_score},
         )
 
-    async def _update_satisfaction(self, conversation: Conversation):
+    async def _auto_summarize(
+        self, conversation: Conversation, *, tracker: UsageTracker | None = None
+    ):
+        """Auto-summarize conversations with 20+ messages and no existing summary."""
+        if conversation.summary:
+            return
+
+        count_result = await self.db.execute(
+            select(func.count(Message.id)).where(
+                Message.conversation_id == conversation.id
+            )
+        )
+        total_count = count_result.scalar() or 0
+
+        if total_count <= 20:
+            return
+
+        # Fetch messages for summarization
+        msg_result = await self.db.execute(
+            select(Message)
+            .where(Message.conversation_id == conversation.id)
+            .order_by(Message.created_at.asc())
+            .limit(50)
+        )
+        messages = msg_result.scalars().all()
+        msg_dicts = [
+            {"sender_type": m.sender_type, "content": m.content or ""}
+            for m in messages
+        ]
+
+        from app.ai.memory.summarizer import ConversationSummarizer
+
+        summarizer = ConversationSummarizer()
+        summary = await summarizer.summarize(msg_dicts, tracker=tracker)
+        if summary:
+            conversation.summary = summary
+
+    async def _update_satisfaction(
+        self, conversation: Conversation, *, tracker: UsageTracker | None = None
+    ):
         """Update conversation satisfaction score from recent messages."""
         result = await self.db.execute(
             select(Message)
@@ -407,7 +545,20 @@ class AIResponseService:
             for m in messages
         ]
 
-        analyzer = SatisfactionAnalyzer()
-        analysis = analyzer.analyze(msg_dicts)
+        try:
+            from app.ai.llm_router import get_light_llm
+
+            llm = get_light_llm()
+        except Exception:
+            llm = None
+        analyzer = SatisfactionAnalyzer(llm=llm)
+        analysis = await analyzer.aanalyze(msg_dicts, tracker=tracker)
         conversation.satisfaction_score = analysis.score
         conversation.satisfaction_level = analysis.level
+
+        await manager.broadcast_to_clinic(conversation.clinic_id, {
+            "type": "satisfaction_updated",
+            "conversation_id": str(conversation.id),
+            "score": analysis.score,
+            "level": analysis.level,
+        })

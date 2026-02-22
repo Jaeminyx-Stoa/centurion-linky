@@ -1,0 +1,231 @@
+import type { TranslationKey } from "./ko";
+
+const ja: Record<TranslationKey, string> = {
+  // Navigation
+  "nav.dashboard": "ダッシュボード",
+  "nav.conversations": "メッセージ",
+  "nav.customers": "顧客",
+  "nav.bookings": "予約",
+  "nav.payments": "決済",
+  "nav.procedures": "施術",
+  "nav.crm": "CRM",
+  "nav.analytics": "統計",
+  "nav.knowledge": "ナレッジ",
+  "nav.aiLab": "AI Lab",
+  "nav.settings": "設定",
+  "nav.logout": "ログアウト",
+  "nav.mainNav": "メインナビゲーション",
+  "nav.openMenu": "メニューを開く",
+  "nav.closeMenu": "メニューを閉じる",
+  "nav.navMenu": "ナビゲーションメニュー",
+
+  // Common actions
+  "common.save": "保存",
+  "common.cancel": "キャンセル",
+  "common.delete": "削除",
+  "common.edit": "編集",
+  "common.add": "追加",
+  "common.search": "検索",
+  "common.filter": "フィルター",
+  "common.all": "すべて",
+  "common.back": "戻る",
+  "common.backToList": "一覧に戻る",
+  "common.loading": "読み込み中...",
+  "common.noData": "データがありません",
+  "common.error": "エラーが発生しました",
+  "common.retry": "再試行",
+  "common.confirm": "確認",
+  "common.close": "閉じる",
+  "common.copy": "コピー",
+  "common.total": "合計",
+  "common.status": "ステータス",
+
+  // Auth
+  "auth.login": "ログイン",
+  "auth.register": "新規登録",
+  "auth.email": "メールアドレス",
+  "auth.password": "パスワード",
+  "auth.name": "名前",
+  "auth.clinicName": "クリニック名",
+  "auth.clinicSlug": "クリニックスラッグ",
+  "auth.loginFailed": "メールアドレスまたはパスワードが正しくありません",
+
+  // Dashboard
+  "dashboard.title": "ダッシュボード",
+  "dashboard.totalConversations": "全会話",
+  "dashboard.activeConversations": "進行中",
+  "dashboard.todayMessages": "本日のメッセージ",
+  "dashboard.aiHandled": "AI対応",
+
+  // Conversations
+  "conversations.title": "会話",
+  "conversations.empty": "会話がありません",
+  "conversations.selectConversation": "会話を選択してください",
+  "conversations.sendMessage": "メッセージを入力...",
+  "conversations.send": "送信",
+  "conversations.aiMode": "AIモード",
+  "conversations.manualMode": "手動モード",
+  "conversations.resolve": "解決",
+  "conversations.backToList": "会話一覧に戻る",
+
+  // Customers
+  "customers.title": "顧客管理",
+  "customers.empty": "顧客がいません",
+  "customers.detail": "顧客詳細",
+  "customers.name": "名前",
+  "customers.phone": "電話番号",
+  "customers.email": "メールアドレス",
+  "customers.country": "国",
+  "customers.language": "言語",
+  "customers.notes": "メモ",
+  "customers.totalBookings": "予約数",
+  "customers.totalPayments": "決済数",
+
+  // Bookings
+  "bookings.title": "予約管理",
+  "bookings.empty": "予約がありません",
+  "bookings.status.all": "すべて",
+  "bookings.status.pending": "保留",
+  "bookings.status.confirmed": "確定",
+  "bookings.status.completed": "完了",
+  "bookings.status.cancelled": "キャンセル",
+  "bookings.status.noshow": "ノーショー",
+  "bookings.complete": "完了処理",
+  "bookings.cancelBooking": "予約キャンセル",
+
+  // Payments
+  "payments.title": "決済管理",
+  "payments.empty": "決済履歴がありません",
+  "payments.status.all": "すべて",
+  "payments.status.pending": "保留",
+  "payments.status.completed": "完了",
+  "payments.status.refunded": "返金",
+  "payments.status.cancelled": "キャンセル",
+  "payments.amount": "金額",
+  "payments.method": "決済方法",
+
+  // Procedures
+  "procedures.title": "施術管理",
+  "procedures.tab.procedures": "施術一覧",
+  "procedures.tab.pricing": "料金管理",
+  "procedures.empty": "登録された施術がありません",
+  "procedures.deletePrice": "料金を削除",
+
+  // CRM
+  "crm.title": "CRM",
+  "crm.tab.events": "CRMイベント",
+  "crm.tab.surveys": "満足度アンケート",
+  "crm.events.empty": "CRMイベントがありません",
+  "crm.events.cancel": "キャンセル",
+  "crm.events.cancelEvent": "イベントキャンセル",
+  "crm.events.scheduled": "予定",
+  "crm.events.sent": "送信済み",
+  "crm.events.completed": "完了",
+  "crm.events.cancelled": "キャンセル済み",
+  "crm.events.failed": "失敗",
+  "crm.surveys.empty": "アンケートデータがありません",
+  "crm.surveys.total": "アンケート総数",
+  "crm.surveys.avgOverall": "平均総合",
+  "crm.surveys.service": "サービス",
+  "crm.surveys.result": "結果",
+  "crm.surveys.nps": "NPS",
+  "crm.surveys.revisit": "再訪",
+
+  // Analytics
+  "analytics.title": "統計",
+  "analytics.tab.overview": "概要",
+  "analytics.tab.conversations": "会話分析",
+  "analytics.tab.revenue": "売上分析",
+  "analytics.tab.satisfaction": "満足度",
+  "analytics.tab.ai": "AIパフォーマンス",
+
+  // Knowledge
+  "knowledge.title": "ナレッジ管理",
+  "knowledge.tab.responses": "回答ライブラリ",
+  "knowledge.tab.terms": "医学用語",
+  "knowledge.editAnswer": "回答を編集",
+  "knowledge.deleteAnswer": "回答を削除",
+  "knowledge.deleteTerm": "用語を削除",
+
+  // AI Lab
+  "aiLab.title": "AI Lab",
+  "aiLab.tab.personas": "AIペルソナ",
+  "aiLab.tab.abTests": "A/Bテスト",
+  "aiLab.tab.simulations": "シミュレーション",
+
+  // Settings
+  "settings.title": "設定",
+  "settings.tab.accounts": "メッセンジャーアカウント",
+  "settings.tab.personas": "AIペルソナ",
+  "settings.tab.profile": "プロフィール",
+  "settings.copyWebhookUrl": "Webhook URLをコピー",
+  "settings.editAccount": "メッセンジャーアカウント編集",
+  "settings.deleteAccount": "メッセンジャーアカウント削除",
+  "settings.deletePersona": "AIペルソナ削除",
+
+  // Settlements
+  "settlements.title": "精算管理",
+  "settlements.empty": "精算履歴がありません",
+
+  // Pagination
+  "pagination.showing": "{start}-{end}件 / 全{total}件",
+  "pagination.prev": "前へ",
+  "pagination.next": "次へ",
+
+  // Error boundary
+  "error.title": "エラーが発生しました",
+  "error.retry": "再試行",
+
+  // Theme
+  "theme.light": "ライトモード",
+  "theme.dark": "ダークモード",
+  "theme.system": "システム設定",
+
+  // Satisfaction labels (accessibility)
+  "satisfaction.green": "とても満足",
+  "satisfaction.yellow": "満足",
+  "satisfaction.orange": "普通",
+  "satisfaction.red": "不満",
+
+  // Command palette
+  "command.title": "コマンド",
+  "command.placeholder": "ページを検索...",
+  "command.navigation": "ページ移動",
+  "command.actions": "クイックアクション",
+  "command.noResults": "結果なし",
+
+  // Notifications
+  "notification.escalation": "エスカレーション通知",
+  "notification.satisfactionWarning": "満足度警告",
+  "notification.deliveryFailed": "メッセージ送信失敗",
+  "notification.quotaWarning": "LLMコスト警告",
+  "notification.quotaExceeded": "LLMコスト上限超過",
+  "notification.markAllRead": "すべて既読",
+  "notification.empty": "通知はありません",
+
+  // AI Feedback
+  "feedback.helpful": "役に立った",
+  "feedback.notHelpful": "役に立たなかった",
+  "feedback.thanks": "フィードバックありがとうございます",
+
+  // LLM Usage
+  "llmUsage.title": "LLMコスト",
+  "llmUsage.tab.summary": "月次サマリー",
+  "llmUsage.tab.daily": "日次推移",
+  "llmUsage.tab.quota": "予算管理",
+  "llmUsage.totalCost": "総コスト",
+  "llmUsage.totalTokens": "総トークン",
+  "llmUsage.operation": "操作",
+  "llmUsage.count": "呼び出し数",
+  "llmUsage.inputTokens": "入力トークン",
+  "llmUsage.outputTokens": "出力トークン",
+  "llmUsage.cost": "コスト (USD)",
+  "llmUsage.date": "日付",
+  "llmUsage.quota": "月間予算",
+  "llmUsage.currentUsage": "今月の使用量",
+  "llmUsage.usagePercent": "使用率",
+  "llmUsage.setQuota": "予算を設定",
+  "llmUsage.noQuota": "予算未設定",
+};
+
+export default ja;

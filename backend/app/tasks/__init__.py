@@ -1,6 +1,7 @@
 """Celery app configuration and task definitions."""
 
 from celery import Celery
+from celery.schedules import crontab
 
 from app.config import settings
 
@@ -39,6 +40,7 @@ celery_app.conf.update(
     task_routes={
         "app.tasks.ai_response.*": {"queue": "ai"},
         "app.tasks.crm_execution.*": {"queue": "default"},
+        "app.tasks.message_delivery.*": {"queue": "default"},
         "app.tasks.notifications.*": {"queue": "default"},
     },
 
@@ -57,6 +59,22 @@ celery_app.conf.update(
         "execute-due-crm-events": {
             "task": "app.tasks.crm_execution.execute_due_events",
             "schedule": 300.0,  # every 5 minutes
+        },
+        "reindex-pending-embeddings": {
+            "task": "app.tasks.indexing.reindex_pending",
+            "schedule": 1800.0,  # every 30 minutes
+        },
+        "monthly-performance": {
+            "task": "app.tasks.analytics.calculate_monthly_performance",
+            "schedule": crontab(day_of_month=1, hour=2, minute=0),
+        },
+        "monthly-settlements": {
+            "task": "app.tasks.analytics.generate_monthly_settlements",
+            "schedule": crontab(day_of_month=1, hour=3, minute=0),
+        },
+        "summarize-conversations": {
+            "task": "app.tasks.analytics.summarize_conversations",
+            "schedule": crontab(minute=0),  # every hour
         },
     },
 )

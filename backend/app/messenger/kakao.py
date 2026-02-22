@@ -8,13 +8,14 @@
 import uuid
 from datetime import datetime, timezone
 
-import httpx
-
+from app.core.resilience import CircuitBreaker, get_http_client
 from app.messenger.base import AbstractMessengerAdapter, StandardMessage
 from app.messenger.factory import MessengerAdapterFactory
 from app.models.messenger_account import MessengerAccount
 
 KAKAO_API_BASE = "https://kapi.kakao.com"
+
+_circuit = CircuitBreaker("kakao")
 
 
 class KakaoAdapter(AbstractMessengerAdapter):
@@ -91,12 +92,17 @@ class KakaoAdapter(AbstractMessengerAdapter):
                 "link": {},
             },
         }
-        async with httpx.AsyncClient() as client:
-            await client.post(
-                url,
-                json=payload,
-                headers={"Authorization": f"Bearer {api_key}"},
-            )
+
+        async def _send():
+            async with get_http_client() as client:
+                response = await client.post(
+                    url,
+                    json=payload,
+                    headers={"Authorization": f"Bearer {api_key}"},
+                )
+                response.raise_for_status()
+
+        await _circuit.call(_send)
         return str(uuid.uuid4())
 
     async def send_typing_indicator(

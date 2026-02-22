@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Send, Bot, User, Shield, ArrowLeft } from "lucide-react";
+import { Send, Bot, User, Shield, ArrowLeft, ThumbsUp, ThumbsDown } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuthStore } from "@/stores/auth";
 import { useConversationStore } from "@/stores/conversation";
+import { useT } from "@/i18n";
+import { api } from "@/lib/api";
 
 export function ChatWindow() {
   const { accessToken } = useAuthStore();
@@ -20,7 +22,23 @@ export function ChatWindow() {
     resolveConversation,
   } = useConversationStore();
   const [input, setInput] = useState("");
+  const [feedbackSent, setFeedbackSent] = useState<Record<string, string>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const t = useT();
+
+  const handleFeedback = async (messageId: string, rating: "up" | "down") => {
+    if (!accessToken || !selectedId) return;
+    try {
+      await api.post(
+        `/api/v1/conversations/${selectedId}/messages/${messageId}/feedback`,
+        { rating },
+        { token: accessToken },
+      );
+      setFeedbackSent((prev) => ({ ...prev, [messageId]: rating }));
+    } catch {
+      // Silently fail
+    }
+  };
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -156,6 +174,46 @@ export function ChatWindow() {
                   <p className="mt-1 border-t border-border/50 pt-1 text-xs text-muted-foreground">
                     {msg.translated_content}
                   </p>
+                )}
+
+                {/* AI feedback buttons */}
+                {msg.sender_type === "ai" && (
+                  <div className="mt-1 flex items-center gap-1 border-t border-border/30 pt-1">
+                    {feedbackSent[msg.id] ? (
+                      <span className="text-[10px] text-muted-foreground">
+                        {t("feedback.thanks")}
+                      </span>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => handleFeedback(msg.id, "up")}
+                          className={`rounded p-0.5 text-muted-foreground hover:text-green-600 ${
+                            (msg.ai_metadata as Record<string, unknown> | null)?.feedback &&
+                            (msg.ai_metadata as Record<string, { rating: string }>)?.feedback?.rating === "up"
+                              ? "text-green-600"
+                              : ""
+                          }`}
+                          aria-label={t("feedback.helpful")}
+                          title={t("feedback.helpful")}
+                        >
+                          <ThumbsUp className="h-3 w-3" />
+                        </button>
+                        <button
+                          onClick={() => handleFeedback(msg.id, "down")}
+                          className={`rounded p-0.5 text-muted-foreground hover:text-red-500 ${
+                            (msg.ai_metadata as Record<string, unknown> | null)?.feedback &&
+                            (msg.ai_metadata as Record<string, { rating: string }>)?.feedback?.rating === "down"
+                              ? "text-red-500"
+                              : ""
+                          }`}
+                          aria-label={t("feedback.notHelpful")}
+                          title={t("feedback.notHelpful")}
+                        >
+                          <ThumbsDown className="h-3 w-3" />
+                        </button>
+                      </>
+                    )}
+                  </div>
                 )}
               </div>
             </div>

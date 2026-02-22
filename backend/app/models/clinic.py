@@ -1,7 +1,7 @@
 import uuid
 from decimal import Decimal
 
-from sqlalchemy import Boolean, Numeric, String, Text
+from sqlalchemy import Boolean, Float, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -27,6 +27,10 @@ class Clinic(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     settings: Mapped[dict] = mapped_column(JSONB, default=dict)
 
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    # LLM quota
+    llm_monthly_quota_usd: Mapped[float | None] = mapped_column(Float, nullable=True)
+    llm_quota_alert_sent: Mapped[bool] = mapped_column(Boolean, default=False)
 
     # Relationships
     users: Mapped[list["User"]] = relationship(back_populates="clinic")  # noqa: F821

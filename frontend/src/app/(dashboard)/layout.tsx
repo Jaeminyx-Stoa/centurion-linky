@@ -5,6 +5,8 @@ import { useEffect } from "react";
 
 import { useAuthStore } from "@/stores/auth";
 import { Sidebar, MobileHeader } from "@/components/dashboard/sidebar";
+import { CommandPalette } from "@/components/dashboard/command-palette";
+import { NotificationToast } from "@/components/shared/notification-toast";
 import { ErrorBoundary } from "@/components/shared/error-boundary";
 
 export default function DashboardLayout({
@@ -34,6 +36,8 @@ export default function DashboardLayout({
       <main className="flex flex-1 overflow-hidden">
         <ErrorBoundary>{children}</ErrorBoundary>
       </main>
+      <CommandPalette />
+      <NotificationToast />
     </div>
   );
 }

@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.exceptions import UnauthorizedError
+from app.core.exceptions import ForbiddenError, UnauthorizedError
 from app.core.logging import clinic_id_var, user_id_var
 from app.core.security import decode_token
 from app.models.user import User
@@ -47,3 +47,14 @@ def get_pagination(
     offset: int = Query(default=0, ge=0),
 ) -> PaginationParams:
     return PaginationParams(limit=limit, offset=offset)
+
+
+def require_role(*roles: str):
+    """Dependency factory: restrict endpoint access to specific user roles."""
+
+    async def _check(current_user: User = Depends(get_current_user)) -> User:
+        if current_user.role not in roles:
+            raise ForbiddenError("Insufficient permissions")
+        return current_user
+
+    return _check

@@ -10,6 +10,7 @@ from app.models.conversation import Conversation
 from app.models.crm_event import CRMEvent
 from app.models.cultural_profile import CulturalProfile
 from app.models.customer import Customer
+from app.models.llm_usage import LLMUsage
 from app.models.medical_term import MedicalTerm
 from app.models.message import Message
 from app.models.messenger_account import MessengerAccount
@@ -39,6 +40,7 @@ __all__ = [
     "CRMEvent",
     "CulturalProfile",
     "Customer",
+    "LLMUsage",
     "MedicalTerm",
     "Message",
     "MessengerAccount",

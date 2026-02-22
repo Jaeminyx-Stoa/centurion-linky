@@ -1,5 +1,6 @@
 import uuid
 
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import Boolean, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
@@ -28,6 +29,8 @@ class MedicalTerm(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    embedding: Mapped[list[float] | None] = mapped_column(Vector(1536))
 
     def __repr__(self) -> str:
         return f"<MedicalTerm {self.term_ko}>"

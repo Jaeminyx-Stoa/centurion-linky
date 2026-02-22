@@ -29,6 +29,14 @@ class UnauthorizedError(AppException):
         )
 
 
+class ForbiddenError(AppException):
+    def __init__(self, detail: str = "Insufficient permissions"):
+        super().__init__(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=detail,
+        )
+
+
 class ConflictError(AppException):
     def __init__(self, detail: str = "Resource already exists"):
         super().__init__(

@@ -54,9 +54,26 @@ class Settings(BaseSettings):
     ai_temperature: float = 0.7
     ai_max_tokens: int = 1024
 
+    # Stripe
+    stripe_secret_key: str = ""
+    stripe_webhook_secret: str = ""
+    stripe_publishable_key: str = ""
+
+    # KingOrder
+    kingorder_secret_key: str = ""
+
+    # Alipay
+    alipay_public_key: str = ""
+
     # Azure Blob Storage
     azure_storage_connection_string: str = ""
     azure_storage_container: str = "uploads"
+
+    # Resilience
+    http_timeout_seconds: int = 30
+    http_max_retries: int = 3
+    circuit_breaker_failure_threshold: int = 5
+    circuit_breaker_recovery_timeout: int = 60
 
     # Rate limiting
     rate_limit_default: str = "100/minute"

@@ -93,6 +93,17 @@ class PaymentService:
             schedule_crm_for_payment.delay(str(payment.id))
 
         await self.db.flush()
+
+        # Broadcast payment status update via WebSocket
+        from app.websocket.manager import manager as ws_manager
+
+        await ws_manager.broadcast_to_clinic(payment.clinic_id, {
+            "type": "payment_updated",
+            "payment_id": str(payment.id),
+            "booking_id": str(payment.booking_id) if payment.booking_id else None,
+            "status": payment.status,
+        })
+
         return payment
 
     async def request_remaining(

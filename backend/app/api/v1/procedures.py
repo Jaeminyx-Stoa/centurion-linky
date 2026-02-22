@@ -87,6 +87,8 @@ async def update_procedure(
     update_data = body.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(proc, field, value)
+    # Mark for re-indexing
+    proc.embedding = None
     await db.flush()
     await db.refresh(proc)
     return proc

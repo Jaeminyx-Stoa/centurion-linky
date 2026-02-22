@@ -8,13 +8,14 @@ import hashlib
 import hmac
 from datetime import datetime, timezone
 
-import httpx
-
+from app.core.resilience import CircuitBreaker, get_http_client
 from app.messenger.base import AbstractMessengerAdapter, StandardMessage
 from app.messenger.factory import MessengerAdapterFactory
 from app.models.messenger_account import MessengerAccount
 
 GRAPH_API_BASE = "https://graph.facebook.com/v21.0"
+
+_circuit = CircuitBreaker("meta_graph_api")
 
 
 class MetaBaseAdapter(AbstractMessengerAdapter):
@@ -46,10 +47,15 @@ class MetaBaseAdapter(AbstractMessengerAdapter):
             "recipient": {"id": recipient_id},
             "sender_action": "typing_on",
         }
-        async with httpx.AsyncClient() as client:
-            await client.post(
-                url, json=payload, params={"access_token": token}
-            )
+
+        async def _send():
+            async with get_http_client() as client:
+                response = await client.post(
+                    url, json=payload, params={"access_token": token}
+                )
+                response.raise_for_status()
+
+        await _circuit.call(_send)
 
     async def get_user_profile(
         self, account: MessengerAccount, user_id: str
@@ -57,15 +63,20 @@ class MetaBaseAdapter(AbstractMessengerAdapter):
         """Fetch user profile from Graph API."""
         token = account.credentials.get("page_access_token") or account.credentials.get("access_token")
         url = f"{GRAPH_API_BASE}/{user_id}"
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                url,
-                params={
-                    "fields": "name,profile_pic",
-                    "access_token": token,
-                },
-            )
-            return response.json()
+
+        async def _fetch():
+            async with get_http_client() as client:
+                response = await client.get(
+                    url,
+                    params={
+                        "fields": "name,profile_pic",
+                        "access_token": token,
+                    },
+                )
+                response.raise_for_status()
+                return response.json()
+
+        return await _circuit.call(_fetch)
 
 
 # ============================================================
@@ -135,11 +146,16 @@ class InstagramAdapter(MetaBaseAdapter):
             "recipient": {"id": recipient_id},
             "message": {"text": text},
         }
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                url, json=payload, params={"access_token": token}
-            )
-            data = response.json()
+
+        async def _send():
+            async with get_http_client() as client:
+                response = await client.post(
+                    url, json=payload, params={"access_token": token}
+                )
+                response.raise_for_status()
+                return response.json()
+
+        data = await _circuit.call(_send)
         return data.get("message_id", "")
 
 
@@ -209,11 +225,16 @@ class FacebookAdapter(MetaBaseAdapter):
             "recipient": {"id": recipient_id},
             "message": {"text": text},
         }
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                url, json=payload, params={"access_token": token}
-            )
-            data = response.json()
+
+        async def _send():
+            async with get_http_client() as client:
+                response = await client.post(
+                    url, json=payload, params={"access_token": token}
+                )
+                response.raise_for_status()
+                return response.json()
+
+        data = await _circuit.call(_send)
         return data.get("message_id", "")
 
 
@@ -298,13 +319,18 @@ class WhatsAppAdapter(MetaBaseAdapter):
             "type": "text",
             "text": {"body": text},
         }
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                url,
-                json=payload,
-                headers={"Authorization": f"Bearer {token}"},
-            )
-            data = response.json()
+
+        async def _send():
+            async with get_http_client() as client:
+                response = await client.post(
+                    url,
+                    json=payload,
+                    headers={"Authorization": f"Bearer {token}"},
+                )
+                response.raise_for_status()
+                return response.json()
+
+        data = await _circuit.call(_send)
         return data.get("messages", [{}])[0].get("id", "")
 
     async def send_typing_indicator(

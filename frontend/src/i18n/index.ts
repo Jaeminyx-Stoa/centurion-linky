@@ -3,10 +3,13 @@ import { persist } from "zustand/middleware";
 
 import ko, { type TranslationKey } from "./ko";
 import en from "./en";
+import ja from "./ja";
+import zh from "./zh";
+import vi from "./vi";
 
-export type Locale = "ko" | "en";
+export type Locale = "ko" | "en" | "ja" | "zh" | "vi";
 
-const TRANSLATIONS: Record<Locale, Record<TranslationKey, string>> = { ko, en };
+const TRANSLATIONS: Record<Locale, Record<TranslationKey, string>> = { ko, en, ja, zh, vi };
 
 interface I18nState {
   locale: Locale;

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef } from "react";
 
 import { useAuthStore } from "@/stores/auth";
 import { useConversationStore } from "@/stores/conversation";
+import { useNotificationStore } from "@/stores/notification";
 import type { Message } from "@/types/conversation";
 
 const WS_BASE_URL =
@@ -18,6 +19,7 @@ const MAX_DELAY_MS = 30000;
 export function useWebSocket() {
   const { accessToken } = useAuthStore();
   const { onNewMessage, onConversationUpdate } = useConversationStore();
+  const addNotification = useNotificationStore((s) => s.addNotification);
   const wsRef = useRef<WebSocket | null>(null);
   const retriesRef = useRef(0);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -51,7 +53,41 @@ export function useWebSocket() {
             }
             break;
           case "escalation_alert":
-            // Could show a toast notification
+            addNotification({
+              type: "escalation",
+              title: "Escalation",
+              message: data.message || "Agent escalation required",
+            });
+            break;
+          case "satisfaction_updated":
+            if (data.score != null && data.score < 50) {
+              addNotification({
+                type: "satisfaction_warning",
+                title: "Satisfaction Warning",
+                message: `Score dropped to ${data.score} (${data.level})`,
+              });
+            }
+            break;
+          case "delivery_failed":
+            addNotification({
+              type: "delivery_failed",
+              title: "Delivery Failed",
+              message: `Message delivery failed (${data.messenger_type})`,
+            });
+            break;
+          case "quota_warning":
+            addNotification({
+              type: "quota_warning",
+              title: "LLM Cost Warning",
+              message: `Usage at ${data.usage_percent}% of quota ($${data.current_cost_usd}/$${data.quota_usd})`,
+            });
+            break;
+          case "quota_exceeded":
+            addNotification({
+              type: "quota_exceeded",
+              title: "LLM Cost Exceeded",
+              message: `Monthly quota exceeded ($${data.current_cost_usd}/$${data.quota_usd})`,
+            });
             break;
         }
       } catch {
@@ -75,7 +111,7 @@ export function useWebSocket() {
         reconnectTimerRef.current = setTimeout(connect, delay);
       }
     };
-  }, [accessToken, onNewMessage, onConversationUpdate]);
+  }, [accessToken, onNewMessage, onConversationUpdate, addNotification]);
 
   useEffect(() => {
     connect();

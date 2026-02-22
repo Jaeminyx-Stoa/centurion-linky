@@ -1,5 +1,6 @@
 import uuid
 
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import ARRAY, Boolean, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -24,6 +25,8 @@ class ResponseLibrary(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     tags: Mapped[list[str] | None] = mapped_column(ARRAY(Text))
 
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    embedding: Mapped[list[float] | None] = mapped_column(Vector(1536))
 
     def __repr__(self) -> str:
         return f"<ResponseLibrary {self.category}/{self.subcategory}>"

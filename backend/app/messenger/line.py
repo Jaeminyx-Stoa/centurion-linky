@@ -11,13 +11,14 @@ import hmac
 import uuid
 from datetime import datetime, timezone
 
-import httpx
-
+from app.core.resilience import CircuitBreaker, get_http_client
 from app.messenger.base import AbstractMessengerAdapter, StandardMessage
 from app.messenger.factory import MessengerAdapterFactory
 from app.models.messenger_account import MessengerAccount
 
 LINE_API_BASE = "https://api.line.me/v2/bot"
+
+_circuit = CircuitBreaker("line")
 
 
 class LineAdapter(AbstractMessengerAdapter):
@@ -109,12 +110,17 @@ class LineAdapter(AbstractMessengerAdapter):
             "to": recipient_id,
             "messages": [{"type": "text", "text": text}],
         }
-        async with httpx.AsyncClient() as client:
-            await client.post(
-                url,
-                json=payload,
-                headers={"Authorization": f"Bearer {token}"},
-            )
+
+        async def _send():
+            async with get_http_client() as client:
+                response = await client.post(
+                    url,
+                    json=payload,
+                    headers={"Authorization": f"Bearer {token}"},
+                )
+                response.raise_for_status()
+
+        await _circuit.call(_send)
         # LINE Push API doesn't return message_id; generate one for tracking
         return str(uuid.uuid4())
 
@@ -130,11 +136,16 @@ class LineAdapter(AbstractMessengerAdapter):
         """Fetch user profile from LINE."""
         token = account.credentials["channel_access_token"]
         url = f"{LINE_API_BASE}/profile/{user_id}"
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                url, headers={"Authorization": f"Bearer {token}"}
-            )
-            return response.json()
+
+        async def _fetch():
+            async with get_http_client() as client:
+                response = await client.get(
+                    url, headers={"Authorization": f"Bearer {token}"}
+                )
+                response.raise_for_status()
+                return response.json()
+
+        return await _circuit.call(_fetch)
 
 
 # Register adapter

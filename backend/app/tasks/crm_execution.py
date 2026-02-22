@@ -150,6 +150,16 @@ async def _execute_due_events() -> dict:
                         event.customer_id,
                     )
 
+                    # Broadcast CRM event sent via WebSocket
+                    from app.websocket.manager import manager as ws_manager
+
+                    await ws_manager.broadcast_to_clinic(event.clinic_id, {
+                        "type": "crm_event_sent",
+                        "event_id": str(event.id),
+                        "event_type": event.event_type,
+                        "customer_id": str(event.customer_id),
+                    })
+
                 except Exception as e:
                     logger.exception(
                         "Failed to execute CRM event %s: %s", event.id, e

@@ -1,6 +1,12 @@
+"""KingOrder payment provider — Korean PG with HMAC-SHA256 webhook verification."""
+
+import hashlib
+import hmac
+import logging
 import uuid
 from datetime import datetime, timezone
 
+from app.config import settings
 from app.payment.base import (
     AbstractPaymentProvider,
     PaymentLinkResult,
@@ -8,9 +14,11 @@ from app.payment.base import (
     RefundResult,
 )
 
+logger = logging.getLogger(__name__)
+
 
 class KingOrderProvider(AbstractPaymentProvider):
-    """KingOrder payment provider (stub implementation for MVP)."""
+    """KingOrder payment provider with QR code support."""
 
     async def create_payment_link(
         self, amount: float, currency: str, metadata: dict | None = None
@@ -26,8 +34,20 @@ class KingOrderProvider(AbstractPaymentProvider):
     async def verify_webhook(
         self, request_data: bytes, headers: dict
     ) -> bool:
-        # TODO: Implement real signature verification
-        return True
+        secret = settings.kingorder_secret_key
+        if not secret:
+            logger.warning("KingOrder secret key not configured, skipping verification")
+            return True
+
+        signature = headers.get("x-kingorder-signature", "")
+        if not signature:
+            logger.warning("Missing x-kingorder-signature header")
+            return False
+
+        expected = hmac.new(
+            secret.encode(), request_data, hashlib.sha256
+        ).hexdigest()
+        return hmac.compare_digest(signature, expected)
 
     async def parse_webhook(self, request_data: dict) -> PaymentResult:
         return PaymentResult(

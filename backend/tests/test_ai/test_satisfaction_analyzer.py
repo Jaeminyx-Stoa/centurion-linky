@@ -170,3 +170,46 @@ class TestCombinedAnalysis:
         result = analyzer.analyze(msgs)
         assert result.level in ("orange", "red")
         assert result.score < 70
+
+
+class TestLLMSentiment:
+    @pytest.mark.asyncio
+    async def test_aanalyze_without_llm(self):
+        """aanalyze without LLM should produce same results as sync analyze."""
+        analyzer = SatisfactionAnalyzer()
+        msgs = [_msg("customer", "감사합니다 예약하고 싶어요")]
+        result = await analyzer.aanalyze(msgs)
+        assert isinstance(result, AnalysisResult)
+        assert result.score > 70
+
+    @pytest.mark.asyncio
+    async def test_aanalyze_with_llm(self):
+        """aanalyze with LLM should incorporate LLM score into weights."""
+        from unittest.mock import AsyncMock, MagicMock
+
+        mock_llm = AsyncMock()
+        mock_response = MagicMock()
+        mock_response.content = "85"
+        mock_llm.ainvoke.return_value = mock_response
+
+        analyzer = SatisfactionAnalyzer(llm=mock_llm)
+        msgs = [_msg("customer", "감사합니다 예약하고 싶어요")]
+        result = await analyzer.aanalyze(msgs)
+        assert isinstance(result, AnalysisResult)
+        # LLM was called
+        mock_llm.ainvoke.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_aanalyze_llm_failure_fallback(self):
+        """LLM failure should fall back to non-LLM weights."""
+        from unittest.mock import AsyncMock
+
+        mock_llm = AsyncMock()
+        mock_llm.ainvoke.side_effect = Exception("API error")
+
+        analyzer = SatisfactionAnalyzer(llm=mock_llm)
+        msgs = [_msg("customer", "감사합니다")]
+        result = await analyzer.aanalyze(msgs)
+        # Should still produce valid result
+        assert isinstance(result, AnalysisResult)
+        assert 0 <= result.score <= 100

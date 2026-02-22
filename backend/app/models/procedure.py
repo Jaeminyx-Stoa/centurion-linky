@@ -1,5 +1,6 @@
 import uuid
 
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import Boolean, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -51,6 +52,8 @@ class Procedure(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     anesthesia_details: Mapped[dict | None] = mapped_column(JSONB)
 
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    embedding: Mapped[list[float] | None] = mapped_column(Vector(1536))
 
     # Relationships
     category: Mapped["ProcedureCategory | None"] = relationship(  # noqa: F821

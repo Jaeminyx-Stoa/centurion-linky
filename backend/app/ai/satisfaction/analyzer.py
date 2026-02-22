@@ -1,12 +1,21 @@
 """Real-time conversation satisfaction analyzer.
 
-Analyzes customer messages using three signal types:
-- Language signals (40%): keyword sentiment detection
-- Behavior signals (35%): message length/gap patterns
-- Flow signals (25%): conversation intent/direction
+Analyzes customer messages using three signal types (+ optional LLM):
+- Language signals: keyword sentiment detection
+- Behavior signals: message length/gap patterns
+- Flow signals: conversation intent/direction
+- LLM signals (optional): AI-based tone analysis
+
+Weights:
+  Without LLM: language 40% + behavior 35% + flow 25%
+  With LLM:    language 15% + llm 25% + behavior 35% + flow 25%
 """
 
+import logging
+import re
 from dataclasses import dataclass, field
+
+logger = logging.getLogger(__name__)
 
 _NEGATIVE_KEYWORDS: dict[str, list[str]] = {
     "ko": ["아니요", "됐어요", "그만", "싫어요", "답답", "왜 자꾸", "비싸", "다른 병원"],
@@ -24,6 +33,14 @@ _POSITIVE_KEYWORDS: dict[str, list[str]] = {
 
 _FLOW_POSITIVE = ["예약", "book", "予約", "预约", "언제", "when", "いつ", "什么时候"]
 _FLOW_NEGATIVE = ["생각해볼게", "think about", "考えます", "考虑", "다른 병원", "other clinic", "他の病院", "别的医院"]
+
+LLM_SENTIMENT_PROMPT = """Rate this customer's satisfaction from 0 to 100 based on their tone, \
+word choice, and overall sentiment. Only output a single integer.
+
+Customer messages:
+{messages}
+
+Score:"""
 
 
 @dataclass
@@ -56,12 +73,11 @@ def score_to_level(score: int) -> str:
 class SatisfactionAnalyzer:
     """Analyzes real-time conversation satisfaction from message history."""
 
-    def analyze(self, messages: list[dict]) -> AnalysisResult:
-        """Analyze satisfaction from a list of message dicts.
+    def __init__(self, llm=None):
+        self._llm = llm
 
-        Each message dict should have: sender_type, content, created_at.
-        Returns AnalysisResult with score (0-100) and level.
-        """
+    def analyze(self, messages: list[dict]) -> AnalysisResult:
+        """Synchronous analysis (backward compatible)."""
         language = self._analyze_language_signals(messages)
         behavior = self._analyze_behavior_signals(messages)
         flow = self._analyze_flow_signals(messages)
@@ -80,6 +96,73 @@ class SatisfactionAnalyzer:
             behavior_signals=behavior.details,
             flow_signals=flow.details,
         )
+
+    async def aanalyze(self, messages: list[dict], tracker=None) -> AnalysisResult:
+        """Async analysis with optional LLM sentiment scoring."""
+        language = self._analyze_language_signals(messages)
+        behavior = self._analyze_behavior_signals(messages)
+        flow = self._analyze_flow_signals(messages)
+
+        # LLM sentiment analysis (if available)
+        llm_signal = None
+        if self._llm:
+            llm_signal = await self._analyze_with_llm(messages, tracker=tracker)
+
+        if llm_signal:
+            total = round(
+                language.score * 0.15
+                + llm_signal.score * 0.25
+                + behavior.score * 0.35
+                + flow.score * 0.25
+            )
+        else:
+            total = round(
+                language.score * 0.40
+                + behavior.score * 0.35
+                + flow.score * 0.25
+            )
+        total = max(0, min(100, total))
+
+        return AnalysisResult(
+            score=total,
+            level=score_to_level(total),
+            language_signals=language.details,
+            behavior_signals=behavior.details,
+            flow_signals=flow.details,
+        )
+
+    async def _analyze_with_llm(
+        self, messages: list[dict], *, tracker=None
+    ) -> SignalResult | None:
+        """LLM-based sentiment score from recent customer messages."""
+        customer_msgs = [m for m in messages if m.get("sender_type") == "customer"][-5:]
+        if not customer_msgs:
+            return None
+
+        text = "\n".join(m.get("content", "") for m in customer_msgs)
+        prompt = LLM_SENTIMENT_PROMPT.format(messages=text)
+
+        try:
+            if tracker:
+                from app.ai.tracked_llm import tracked_ainvoke
+
+                response = await tracked_ainvoke(
+                    self._llm, prompt, tracker=tracker, operation="satisfaction"
+                )
+            else:
+                response = await self._llm.ainvoke(prompt)
+            content = response.content if hasattr(response, "content") else str(response)
+            match = re.search(r"\d+", content)
+            if match:
+                score = int(match.group())
+                return SignalResult(
+                    score=max(0, min(100, score)),
+                    details={"llm_raw": content},
+                )
+            return None
+        except Exception:
+            logger.exception("LLM sentiment analysis failed")
+            return None
 
     def _analyze_language_signals(self, messages: list[dict]) -> SignalResult:
         """Analyze linguistic sentiment from customer messages."""

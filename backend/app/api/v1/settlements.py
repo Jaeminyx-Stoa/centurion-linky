@@ -1,18 +1,22 @@
 import uuid
 from datetime import datetime, timezone
+from io import BytesIO
 
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.exceptions import NotFoundError
+from app.core.exceptions import BadRequestError, NotFoundError
 from app.core.pagination import paginate
 from app.dependencies import get_current_user, get_pagination
+from app.models.clinic import Clinic
 from app.models.settlement import Settlement
 from app.models.user import User
 from app.schemas.pagination import PaginatedResponse, PaginationParams
 from app.schemas.settlement import SettlementGenerate, SettlementResponse
+from app.services.invoice_service import InvoiceService
 from app.services.settlement_service import SettlementService
 
 router = APIRouter(prefix="/settlements", tags=["settlements"])
@@ -89,8 +93,6 @@ async def confirm_settlement(
         db, settlement_id, current_user.clinic_id
     )
     if settlement.status != "pending":
-        from app.core.exceptions import BadRequestError
-
         raise BadRequestError(
             f"Cannot confirm settlement in '{settlement.status}' status"
         )
@@ -112,8 +114,6 @@ async def mark_paid(
         db, settlement_id, current_user.clinic_id
     )
     if settlement.status != "confirmed":
-        from app.core.exceptions import BadRequestError
-
         raise BadRequestError(
             f"Cannot mark as paid settlement in '{settlement.status}' status"
         )
@@ -122,3 +122,37 @@ async def mark_paid(
     await db.flush()
     await db.refresh(settlement)
     return settlement
+
+
+@router.get("/{settlement_id}/invoice")
+async def download_invoice(
+    settlement_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Download tax invoice PDF for a settlement."""
+    settlement = await _get_settlement(
+        db, settlement_id, current_user.clinic_id
+    )
+    if settlement.status not in ("confirmed", "paid"):
+        raise BadRequestError(
+            "Invoice is only available for confirmed or paid settlements"
+        )
+
+    # Load clinic info for the invoice
+    clinic_result = await db.execute(
+        select(Clinic).where(Clinic.id == current_user.clinic_id)
+    )
+    clinic = clinic_result.scalar_one()
+
+    invoice_service = InvoiceService()
+    pdf_bytes = invoice_service.generate_pdf(settlement, clinic)
+
+    period = f"{settlement.period_year}-{settlement.period_month:02d}"
+    return StreamingResponse(
+        BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="invoice-{period}.pdf"'
+        },
+    )

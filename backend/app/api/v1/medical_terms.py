@@ -99,6 +99,8 @@ async def update_medical_term(
     update_data = body.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(term, field, value)
+    # Mark for re-indexing
+    term.embedding = None
     await db.flush()
     return term
 

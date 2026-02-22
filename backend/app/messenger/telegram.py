@@ -1,12 +1,13 @@
 from datetime import datetime, timezone
 
-import httpx
-
+from app.core.resilience import CircuitBreaker, get_http_client
 from app.messenger.base import AbstractMessengerAdapter, StandardMessage
 from app.messenger.factory import MessengerAdapterFactory
 from app.models.messenger_account import MessengerAccount
 
 TELEGRAM_API_BASE = "https://api.telegram.org/bot{token}"
+
+_circuit = CircuitBreaker("telegram")
 
 
 class TelegramAdapter(AbstractMessengerAdapter):
@@ -101,10 +102,13 @@ class TelegramAdapter(AbstractMessengerAdapter):
             "parse_mode": "HTML",
         }
 
-        async with httpx.AsyncClient() as client:
-            response = await client.post(url, json=payload)
-            data = response.json()
+        async def _send():
+            async with get_http_client() as client:
+                response = await client.post(url, json=payload)
+                response.raise_for_status()
+                return response.json()
 
+        data = await _circuit.call(_send)
         return str(data["result"]["message_id"])
 
     async def send_typing_indicator(
@@ -117,8 +121,12 @@ class TelegramAdapter(AbstractMessengerAdapter):
             "action": "typing",
         }
 
-        async with httpx.AsyncClient() as client:
-            await client.post(url, json=payload)
+        async def _send():
+            async with get_http_client() as client:
+                response = await client.post(url, json=payload)
+                response.raise_for_status()
+
+        await _circuit.call(_send)
 
     async def get_user_profile(
         self, account: MessengerAccount, user_id: str
@@ -126,10 +134,13 @@ class TelegramAdapter(AbstractMessengerAdapter):
         """Get user info via Telegram getChat API."""
         url = self._api_url(account, "getChat")
 
-        async with httpx.AsyncClient() as client:
-            response = await client.get(url, params={"chat_id": user_id})
-            data = response.json()
+        async def _fetch():
+            async with get_http_client() as client:
+                response = await client.get(url, params={"chat_id": user_id})
+                response.raise_for_status()
+                return response.json()
 
+        data = await _circuit.call(_fetch)
         return data["result"]
 
 

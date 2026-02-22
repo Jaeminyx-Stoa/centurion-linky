@@ -174,11 +174,56 @@ const ko = {
   "error.title": "오류가 발생했습니다",
   "error.retry": "다시 시도",
 
+  // Theme
+  "theme.light": "라이트 모드",
+  "theme.dark": "다크 모드",
+  "theme.system": "시스템 설정",
+
   // Satisfaction labels (accessibility)
   "satisfaction.green": "매우 만족",
   "satisfaction.yellow": "만족",
   "satisfaction.orange": "보통",
   "satisfaction.red": "불만족",
+
+  // Command palette
+  "command.title": "명령",
+  "command.placeholder": "페이지 검색...",
+  "command.navigation": "페이지 이동",
+  "command.actions": "빠른 작업",
+  "command.noResults": "결과 없음",
+
+  // Notifications
+  "notification.escalation": "에스컬레이션 알림",
+  "notification.satisfactionWarning": "만족도 경고",
+  "notification.deliveryFailed": "메시지 발송 실패",
+  "notification.quotaWarning": "LLM 비용 경고",
+  "notification.quotaExceeded": "LLM 비용 한도 초과",
+  "notification.markAllRead": "모두 읽음",
+  "notification.empty": "알림이 없습니다",
+
+  // AI Feedback
+  "feedback.helpful": "도움이 됨",
+  "feedback.notHelpful": "도움이 안 됨",
+  "feedback.thanks": "피드백 감사합니다",
+
+  // LLM Usage
+  "llmUsage.title": "LLM 비용",
+  "llmUsage.tab.summary": "월간 요약",
+  "llmUsage.tab.daily": "일별 추이",
+  "llmUsage.tab.quota": "예산 관리",
+  "llmUsage.totalCost": "총 비용",
+  "llmUsage.totalTokens": "총 토큰",
+  "llmUsage.operation": "작업",
+  "llmUsage.count": "호출 수",
+  "llmUsage.inputTokens": "입력 토큰",
+  "llmUsage.outputTokens": "출력 토큰",
+  "llmUsage.cost": "비용 (USD)",
+  "llmUsage.date": "날짜",
+  "llmUsage.quota": "월 예산",
+  "llmUsage.currentUsage": "이번 달 사용",
+  "llmUsage.usagePercent": "사용률",
+  "llmUsage.setQuota": "예산 설정",
+  "llmUsage.noQuota": "예산 미설정",
 } as const;
 
 export default ko;

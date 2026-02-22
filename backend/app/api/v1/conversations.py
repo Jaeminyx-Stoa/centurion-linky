@@ -1,6 +1,8 @@
 import uuid
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Query
+from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -180,6 +182,15 @@ async def toggle_ai(
         changes={"ai_mode": {"old": old_mode, "new": conv.ai_mode}},
     )
     await db.flush()
+
+    from app.websocket.manager import manager as ws_manager
+
+    await ws_manager.broadcast_to_clinic(current_user.clinic_id, {
+        "type": "conversation_updated",
+        "conversation_id": str(conv.id),
+        "ai_mode": conv.ai_mode,
+    })
+
     return conv
 
 
@@ -192,4 +203,91 @@ async def resolve_conversation(
     conv = await _get_conversation(db, conversation_id, current_user.clinic_id)
     conv.status = "resolved"
     await db.flush()
+
+    from app.websocket.manager import manager as ws_manager
+
+    await ws_manager.broadcast_to_clinic(current_user.clinic_id, {
+        "type": "conversation_updated",
+        "conversation_id": str(conv.id),
+        "status": conv.status,
+    })
+
     return conv
+
+
+@router.post("/{conversation_id}/suggestions")
+async def generate_suggestions(
+    conversation_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Generate AI-powered response suggestions for manual mode."""
+    conv = await _get_conversation(db, conversation_id, current_user.clinic_id)
+
+    if conv.ai_mode:
+        from app.core.exceptions import BadRequestError
+
+        raise BadRequestError("Suggestions are only available in manual mode")
+
+    from app.ai.agents.consultation_service import ConsultationService
+    from app.ai.agents.escalation import EscalationDetector
+    from app.ai.chains.response_chain import ResponseChain
+    from app.services.ai_response_service import AIResponseService
+
+    # Build a minimal AIResponseService for suggestion generation
+    service = AIResponseService(
+        db=db,
+        consultation_service=ConsultationService(
+            response_chain=ResponseChain.__new__(ResponseChain),
+            escalation_detector=EscalationDetector.__new__(EscalationDetector),
+        ),
+    )
+    suggestions = await service.generate_suggestions(conversation_id)
+    return {"suggestions": suggestions}
+
+
+class FeedbackRequest(BaseModel):
+    rating: str  # "up" or "down"
+    note: str | None = None
+
+
+@router.post("/{conversation_id}/messages/{message_id}/feedback")
+async def submit_message_feedback(
+    conversation_id: uuid.UUID,
+    message_id: uuid.UUID,
+    body: FeedbackRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Submit feedback (thumbs up/down) for an AI message."""
+    # Verify conversation belongs to clinic
+    await _get_conversation(db, conversation_id, current_user.clinic_id)
+
+    # Load message
+    result = await db.execute(
+        select(Message).where(
+            Message.id == message_id,
+            Message.conversation_id == conversation_id,
+        )
+    )
+    message = result.scalar_one_or_none()
+    if message is None:
+        raise NotFoundError("Message not found")
+
+    if message.sender_type != "ai":
+        from app.core.exceptions import BadRequestError
+
+        raise BadRequestError("Feedback is only allowed on AI messages")
+
+    # Store feedback in ai_metadata
+    metadata = message.ai_metadata or {}
+    metadata["feedback"] = {
+        "rating": body.rating,
+        "note": body.note,
+        "by": str(current_user.id),
+        "at": datetime.now(timezone.utc).isoformat(),
+    }
+    message.ai_metadata = metadata
+    await db.flush()
+
+    return {"status": "ok", "feedback": metadata["feedback"]}

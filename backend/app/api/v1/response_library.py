@@ -95,6 +95,8 @@ async def update_response_library(
     update_data = body.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(entry, field, value)
+    # Mark for re-indexing
+    entry.embedding = None
     await db.flush()
     return entry
 
